@@ -133,3 +133,9 @@ dmypy.json
 
 # Kernel data
 src/ShiftML_kernels/
+
+# Data dir
+data/
+
+# Working directories
+/working_dir
