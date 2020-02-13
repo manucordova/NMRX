@@ -138,4 +138,4 @@ src/ShiftML_kernels/
 data/
 
 # Working directories
-/working_dir
+working_dir/
