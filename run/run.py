@@ -50,7 +50,14 @@ space_group_sym = ["M","O","Triclinic","M","O","Tetragonal","O","M","O","M"]
 sg = space_groups[choice]
 
 # def select_space_group(choice) -> return sg, sym, n_mol
-dftb_path = "/usr/local/bin/dftb+"
+def which(pgm):
+    path=os.getenv('PATH')
+    for p in path.split(os.path.pathsep):
+        p=os.path.join(p,pgm)
+        if os.path.exists(p) and os.access(p,os.X_OK):
+            return p
+
+dftb_path = which("dftb+")
 
 # Primary parameters to change
 molecule = "cocaine"
@@ -101,18 +108,18 @@ cut = 1.6
 
 energy_constant = 1233197.53153
 
-initial_structure_original = os.path.abspath("../data/input_structures/{}/{}.pdb".format(molecule, molecule))
+initial_structure_original = os.path.abspath("../input_structures/{}/{}.pdb".format(molecule, molecule))
 
 if molecule == "cocaine":
-    initial_structure_original = '../data/input_structures/cocaine/COCAIN10_H_relaxed_out_cell_vc-relax_DFTBplus.pdb'
+    initial_structure_original = '../input_structures/cocaine/COCAIN10_H_relaxed_out_cell_vc-relax_DFTBplus.pdb'
     atoms = 43
     #energy_constant = 276900
 if molecule == "azd":
-    initial_structure_original = '../data/input_structures/azd8329/azd8329_csp.vc-relax.pdb'
+    initial_structure_original = '../input_structures/azd8329/azd8329_csp.vc-relax.pdb'
     atoms = 62
     #energy_constant = 376543
 if molecule == "ritonavir": #space group 19
-    initial_structure_original = '../data/input_structures/ritonavir/Ritonavir_polymorph_2_DFTB_vc-relax.pdb'
+    initial_structure_original = '../input_structures/ritonavir/Ritonavir_polymorph_2_DFTB_vc-relax.pdb'
     #initial_structure_original = root + '/balodis/work/ritonavir/structure_files/Ritonavir_polymorph_2_DFTB_vc-relax.pdb'
     atoms = 98
 
@@ -191,7 +198,7 @@ for k in range(structures):
     n_success += 1
 
     write(directory + name + '/' + experiment + "_" + str(k) + '_init_structure.cif', trial_crystal)
-    print("\t\t\t\t{:.2f}".format(trial_crystal.get_volume()))
+    print("Reasonable structure found after {} tries!".format(n_failed))
 
     #print starting_angles
 
