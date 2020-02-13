@@ -130,3 +130,6 @@ dmypy.json
 
 # MacOS crap
 .DS_Store
+
+# Kernel data
+src/ShiftML_kernels/
