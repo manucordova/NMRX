@@ -125,7 +125,7 @@ def check_for_overlap(trial_crystal, cut, close_atoms, Vmol, vol_high):
 
 Vs = []
 
-def generate_crystal(initial_structure, parameter_set, high_len, low_len, high_angle, low_angle, high_trans, low_trans, rotate_high, rotate_low, sg, atoms, n_mol, molecule, cut, close_atoms, vol_high):
+def generate_crystal(initial_structure, parameter_set, high_angle, low_angle, high_trans, low_trans, rotate_high, rotate_low, sg, atoms, n_mol, molecule, cut, close_atoms, vol_high):
     
     # Calculate the volume of the molecule
     starting = read(initial_structure)

@@ -61,14 +61,14 @@ dftb_path = which("dftb+")
 
 # Primary parameters to change
 molecule = "cocaine"
-nloop = 500
-structures = 1
+nloop = 0
+structures = 999
 simplex = False
 use_energy = True
 C13 = False #Not yet implemented for azd #think about including for bigger molecules like ritonavir
 H1 = True
-H_cutoff= 0.1
-rotation_cycles = 10
+H_cutoff = 0.1
+#rotation_cycles = 10
 factor = 0.005
 experiment = "1"
 comment = '_test'
@@ -87,8 +87,6 @@ vol_high = 3.0
 
 
 # Secondary parameters to change
-low_len = 2.0*nr_molecules[choice] #this needs to be changed later depending on the projections of the molecule
-high_len = 7.5*nr_molecules[choice] #this needs to be changed later depending on the projections of the molecule
 low_angle = 45
 high_angle = 135
 low_trans = 0 #this needs to be changed later depend on the selected cell lenghts and angles
@@ -111,7 +109,8 @@ offset = {}
 slope["H"] = 1.
 offset["H"] = 30.36
 
-energy_constant = 1233197.53153
+#energy_constant = 1233197.53153
+energy_constant = 0
 
 initial_structure_original = os.path.abspath("../input_structures/{}/{}.pdb".format(molecule, molecule))
 
@@ -198,8 +197,7 @@ tot_trials = 0
 n_success = 0
 
 for k in range(structures):
-#    trial_crystal, lat, trans, rotation, starting_angles, n_failed = cr.generate_crystal(initial_structure, parameter_set, high_len, low_len, high_angle, low_angle, high_trans, low_trans, rotate_high, rotate_low, sg, atoms, nr_molecules[choice], molecule, cut, close_atoms, vol_high)
-    trial_crystal, lat, trans, q, starting_angles, n_failed = cr.generate_crystal(initial_structure, parameter_set, high_len, low_len, high_angle, low_angle, high_trans, low_trans, rotate_high, rotate_low, sg, atoms, nr_molecules[choice], molecule, cut, close_atoms, vol_high)
+    trial_crystal, lat, trans, q, starting_angles, n_failed = cr.generate_crystal(initial_structure, parameter_set, high_angle, low_angle, high_trans, low_trans, rotate_high, rotate_low, sg, atoms, nr_molecules[choice], molecule, cut, close_atoms, vol_high)
     tot_trials += n_failed + 1
     n_success += 1
 
@@ -336,7 +334,6 @@ for k in range(structures):
                     trial_angles = vector1 + vector2
                     #trial_structure = cr.create_crystal(starting_copy, molecule, sg, atoms, sites, trial_lat, trial_trans, trial_rotation, trial_angles, nr_molecules[choice])
                     trial_structure = cr.create_crystal(starting_copy, molecule, sg, atoms, sites, trial_lat, trial_trans, trial_q, trial_angles, nr_molecules[choice])
-
 
                     break
                 except Exception as e:
