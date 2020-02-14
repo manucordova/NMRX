@@ -21,7 +21,7 @@ if cluster:
 else:
     root = "/Users"
 
-
+sys.path.insert(0, os.path.abspath("../src"))
 from sML.krr_modules import *
 from ml_tools.utils import get_mae,get_rmse,get_sup,get_spearman,get_score
 import json
@@ -32,7 +32,7 @@ def load_kernel(sp=1):
     # Loading the models
     print "Loading the model for : ", sp
 
-    kernelDir = "../src/ShiftML_kernels/"
+    kernelDir = os.path.abspath("../src/ShiftML_kernels/") + "/"
 
     with open(kernelDir + 'sparse_{}_20000_model_numbers.json'.format(sp), 'r') as f:
         model_numbers = json.load(f)
@@ -235,13 +235,13 @@ def exp_rmsd(y_calc,molecule="cocaine"):
 def lin(x,a):
      return a-x
 
-#def lin(x,a,b):
-#    return a-b*x
+def lin(x,a,b):
+    return a-b*x
 
-def rmsd(y_sort,y_exp):
+def rmsd(y_sort,y_exp, a, b):
     popt, pcov = op.curve_fit(lin,y_sort,y_exp)
     #rmsd = np.sqrt( sum( (y_exp-lin(y_sort,*popt))**2 )/len(y_sort))
-    rmsd = np.sqrt( sum( (y_exp-lin(y_sort,30.36))**2 )/len(y_sort))
+    rmsd = np.sqrt( sum( (y_exp-lin(y_sort,a, b))**2 )/len(y_sort))
     #rmsd = np.sqrt(sum((y_exp - lin(y_sort,33.17,1.88)) ** 2) / len(y_sort))
     return rmsd
 
