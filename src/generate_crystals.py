@@ -22,6 +22,16 @@ import scipy.optimize as op
 
 import mc_functions as mc
 
+def get_close_atoms(struct, cutoff=0.1):
+    close_atoms = []
+    d = struct.get_all_distances(mic=True)
+    #close atoms -> sum of VdW radii - 0.5
+    dup = np.nonzero(d < cutoff)
+    for i, j in zip(dup[0], dup[1]):
+        if j > i:
+            close_atoms.append([i, j])
+    return close_atoms
+
 def rotate_molecule(structure, center, q, atoms):
     
     # Quaternion rotation
@@ -110,7 +120,7 @@ def get_projections(struct, alpha, beta, gamma, atoms, q):
 def check_for_overlap(trial_crystal, cut, close_atoms, Vmol, vol_high):
     """
     """
-    overlapping_atoms = ase.geometry.get_duplicate_atoms(trial_crystal, cutoff=cut, delete=False)
+    overlapping_atoms = get_close_atoms(trial_crystal, cutoff=cut)
     count = 0
     for aa in overlapping_atoms:
         for bb in close_atoms:
