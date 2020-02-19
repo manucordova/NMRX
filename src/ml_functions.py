@@ -218,22 +218,20 @@ def exp_rmsd(y_calc,molecule="cocaine"):
                   ar_av, ar_av, ar_av, ar_av, ar_av,
                   np.mean([y_calc[3], y_calc[4]]), np.mean([y_calc[3], y_calc[4]]), y_calc[5], y_calc[6]]
 
-        # Experimental shifts ordered, but not calibrated correclty
-        y_exp = [2.05, 3.22, 1.79,
-                 4.22, 2.73,
-                 np.mean([3.3, 4.53]), np.mean([3.3, 4.53]),
-                 3.44, 2.40, 1.76,
-                 1.00, 3.86, 2.82, 2.82,
-                 5.21, 5.21, 5.21, 5.21, 5.21, np.mean([2.08, 2.85]), np.mean([2.08, 2.85]),
-                 3.61, 3.88, np.mean([2.07, 3.10]), np.mean([2.07, 3.10]),
-                 5.21, 5.21, 5.21, 5.21, 5.21,
-                 3.7, 3.7, 5.52, 6.04]
+        # Experimental shifts
+        y_exp = [1.24,3.33,0.78,
+                5.11,2.46,
+                 np.mean([3.47,5.67]),np.mean([3.47,5.67]),
+                3.72,1.87,0.73,
+                -0.63,4.47,2.62,2.62,
+                6.88,6.88,6.88,6.88,6.88,np.mean([1.30,2.67]),np.mean([1.30,2.67]),
+                4.03,4.51,np.mean([1.28,3.12]),np.mean([1.28,3.12]),
+                6.88,6.88,6.88,6.88,6.88,
+                4.19,4.19,7.43,8.36]
 
     return np.array(y_sort), np.array(y_exp)
 
 
-def lin(x,a):
-     return a-x
 
 def lin(x,a,b):
     return a-b*x
@@ -242,7 +240,6 @@ def rmsd(y_sort,y_exp, a, b):
     popt, pcov = op.curve_fit(lin,y_sort,y_exp)
     #rmsd = np.sqrt( sum( (y_exp-lin(y_sort,*popt))**2 )/len(y_sort))
     rmsd = np.sqrt( sum( (y_exp-lin(y_sort,a, b))**2 )/len(y_sort))
-    #rmsd = np.sqrt(sum((y_exp - lin(y_sort,33.17,1.88)) ** 2) / len(y_sort))
     return rmsd
 
 # xyz = read("/Users/balodis/work/ritonavir/results/test/1_loops_0.005_factor__H1_True_C13_False_test_1/1_0_init_structure.cif")

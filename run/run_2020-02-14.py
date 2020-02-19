@@ -43,7 +43,7 @@ import dftb as dftb
 random.seed()
 
 #The choice of the space group
-choice = 3
+choice = 1
 space_groups = [14,19,2,4,61,115,33,9,29,5]
 nr_molecules = [4,4,2,2,8,4,4,2,4,2]
 space_group_sym = ["M","O","Triclinic","M","O","Tetragonal","O","M","O","M"]
@@ -60,7 +60,7 @@ def which(pgm):
 dftb_path = which("dftb+")
 
 # Primary parameters to change
-molecule = "cocaine"
+molecule = "ritonavir"
 nloop = 0
 structures = 999
 simplex = False
@@ -80,9 +80,9 @@ comment = '_test'
 #parameter_set = ['a','b','c','alpha','beta','gamma']
 #parameter_set = ['a','b','c','beta','trans','rot','conf']
 #parameter_set = ['trans','rot']
-parameter_set = ['a','b','c', 'beta', 'trans','rot', 'conf']
+parameter_set = ['a','b','c', 'trans','rot']
 #parameter_set = ['conf']
-directory = os.path.abspath('../data/test_cocaine/') + "/"
+directory = os.path.abspath('../data/test_ritonavir/') + "/"
 vol_high = 3.0
 
 
@@ -209,7 +209,7 @@ for k in range(structures):
     # 1H RMSE for the initial randomly generated crystal
     if H1:
         chi = calculate_1H(trial_crystal,krr,representation,trainsoaps,model_numbers,zeta,molecule)
-        print chi
+        print 'Initial 1H rmsd: ' + str(chi)
     else:
         chi = 0
     # 13C RMSE for the initial randomly generated crystal
@@ -220,9 +220,10 @@ for k in range(structures):
     # Energy calculation for the initial randomly generated crystal
     if use_energy:
         energy = dftb.dftbplus_energy(directory+name+'/', directory + name + '/' + experiment+ "_" + str(k) + '_init_structure.cif', dftb_path, dispersion="D3")* 2625.50 + energy_constant
-        print energy
+        print 'Initial dftb energy: ' + str(energy)
     else:
         energy = 0
+
 
     #Saving the starting parameters
     chi_old = chi
