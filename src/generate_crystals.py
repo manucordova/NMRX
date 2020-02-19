@@ -14,7 +14,6 @@ from ase.data import chemical_symbols
 from ase.data import atomic_numbers, vdw_radii
 import sys,os
 from glob import glob
-from copy import copy
 from tqdm import tqdm_notebook
 import cPickle as pck
 
@@ -32,19 +31,19 @@ def get_close_atoms(struct, cutoff=0.1):
             close_atoms.append([i, j])
     return close_atoms
 
-def rotate_molecule(structure, center, q, atoms):
+def rotate_molecule(structure, center, quat, atoms):
     
     # Quaternion rotation
     R = np.zeros((3,3))
-    R[0,0] = q[0]**2 + q[1]**2 - q[2]**2 - q[3]**2
-    R[0,1] = 2*(q[1]*q[2] - q[0]*q[3])
-    R[0,2] = 2*(q[1]*q[3] + q[0]*q[2])
-    R[1,0] = 2*(q[1]*q[2] + q[0]*q[3])
-    R[1,1] = q[0]**2 - q[1]**2 + q[2]**2 - q[3]**2
-    R[1,2] = 2*(q[2]*q[3] - q[0]*q[1])
-    R[2,0] = 2*(q[1]*q[3] - q[0]*q[2])
-    R[2,1] = 2*(q[2]*q[3] + q[0]*q[1])
-    R[2,2] = q[0]**2 - q[1]**2 - q[2]**2 + q[3]**2
+    R[0,0] = quat[0]**2 + quat[1]**2 - quat[2]**2 - quat[3]**2
+    R[0,1] = 2*(quat[1]*quat[2] - quat[0]*quat[3])
+    R[0,2] = 2*(quat[1]*quat[3] + quat[0]*quat[2])
+    R[1,0] = 2*(quat[1]*quat[2] + quat[0]*quat[3])
+    R[1,1] = quat[0]**2 - quat[1]**2 + quat[2]**2 - quat[3]**2
+    R[1,2] = 2*(quat[2]*quat[3] - quat[0]*quat[1])
+    R[2,0] = 2*(quat[1]*quat[3] - quat[0]*quat[2])
+    R[2,1] = 2*(quat[2]*quat[3] + quat[0]*quat[1])
+    R[2,2] = quat[0]**2 - quat[1]**2 - quat[2]**2 + quat[3]**2
     
     xyz = structure.get_positions()
     
@@ -57,14 +56,14 @@ def rotate_molecule(structure, center, q, atoms):
     
     return structure
 
-def create_crystal(structure,molecule,sg,atoms,sites,lat,trans,q,conf_angles, n_mol):
+def create_crystal(structure,molecule,sg,atoms,sites,lat,trans,quat,conf_angles, n_mol):
 #def create_crystal(structure,molecule,sg,atoms,sites,lat,trans,rotation,conf_angles, n_mol):
 
     structure.translate(trans)
 
     mass = structure[0:atoms].get_center_of_mass()
     
-    structure = rotate_molecule(structure, mass, q, atoms)
+    structure = rotate_molecule(structure, mass, quat, atoms)
     
 #    structure.rotate(rotation[0], v='x', center=mass)
 #    structure.rotate(rotation[1], v='y', center=mass)
@@ -87,7 +86,7 @@ def get_third_length_low(a, b, alpha, beta, gamma, Vmol):
     sqroot = np.sqrt(sqroot)
     return Vmol / (a*b*sqroot)
 
-def get_projections(struct, alpha, beta, gamma, atoms, q):
+def get_projections(struct, alpha, beta, gamma, atoms, quat):
     unit_a = np.array([1,0,0])
     unit_b = np.zeros(3)
     unit_b[0] = np.cos(np.deg2rad(gamma))
@@ -97,9 +96,9 @@ def get_projections(struct, alpha, beta, gamma, atoms, q):
     unit_c[1] = (np.cos(np.deg2rad(alpha)) - np.cos(np.deg2rad(beta)) * np.cos(np.deg2rad(gamma))) / np.sin(np.deg2rad(gamma))
     unit_c[2] = np.sqrt(1. - unit_c[0]**2 - unit_c[1]**2)
     
-    s = copy(struct)
+    s = copy.deepcopy(struct)
     mass = s[0:atoms].get_center_of_mass()
-    s = rotate_molecule(s, mass, q, atoms)
+    s = rotate_molecule(s, mass, quat, atoms)
     xyz = s.get_positions()[:atoms]
     
     proj_a = np.zeros(atoms)
@@ -135,10 +134,9 @@ def check_for_overlap(trial_crystal, cut, close_atoms, Vmol, vol_high):
 
 Vs = []
 
-def generate_crystal(initial_structure, parameter_set, high_angle, low_angle, high_trans, low_trans, rotate_high, rotate_low, sg, atoms, n_mol, molecule, cut, close_atoms, vol_high):
+def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans, low_trans, rotate_high, rotate_low, sg, atoms, n_mol, molecule, cut, close_atoms, vol_high):
     
     # Calculate the volume of the molecule
-    starting = read(initial_structure)
     nr = starting.get_atomic_numbers()[:atoms]
     rad = np.zeros(len(nr))
     for l1 in range(0, len(rad)):
@@ -151,8 +149,9 @@ def generate_crystal(initial_structure, parameter_set, high_angle, low_angle, hi
         while True:
             n_failed += 1
             try:
+                starting_copy = copy.deepcopy(starting)
                 #Read in the structure with the right conformation and coordinates
-                starting = read(initial_structure)
+                #starting = read(initial_structure)
 
                 #Get the lattice parameters and sites from the reference structure
                 lat = starting.get_cell_lengths_and_angles()
@@ -175,22 +174,22 @@ def generate_crystal(initial_structure, parameter_set, high_angle, low_angle, hi
                     lat[5] = 90.0
 
                 if 'rot' in parameter_set:
-                    q = np.zeros(4)
-                    q[0] = 0.5-random.random()
-                    q[1] = 0.5-random.random()
-                    q[2] = 0.5-random.random()
-                    q[3] = 0.5-random.random()
-                    q /= np.linalg.norm(q)
+                    quat = np.zeros(4)
+                    quat[0] = 0.5-random.random()
+                    quat[1] = 0.5-random.random()
+                    quat[2] = 0.5-random.random()
+                    quat[3] = 0.5-random.random()
+                    quat /= np.linalg.norm(quat)
                     #rx = (rotate_high - rotate_low) * random.random() + rotate_low
                     #ry = (rotate_high - rotate_low) * random.random() + rotate_low
                     #rz = (rotate_high - rotate_low) * random.random() + rotate_low
                     #rotation = [rx, ry, rz]
                 else:
-                    q = [1,0,0,0]
+                    quat = [1,0,0,0]
                     #rotation = [0, 0, 0]
                 
                 cell_l = ["a", "b", "c"]
-                low_lens = get_projections(starting, lat[3], lat[4], lat[5], atoms, q)
+                low_lens = get_projections(starting, lat[3], lat[4], lat[5], atoms, quat)
                 tmp_l = [0., 0.]
                 for i, x in enumerate(np.random.permutation(cell_l)):
                     ind_l = cell_l.index(x)
@@ -233,7 +232,7 @@ def generate_crystal(initial_structure, parameter_set, high_angle, low_angle, hi
 
 
                 #Overwrite the starting structure and create a trial structure for testing
-                trial_crystal = create_crystal(starting,molecule,sg,atoms,sites,lat,trans,q,starting_angles, n_mol)
+                trial_crystal = create_crystal(starting_copy,molecule,sg,atoms,sites,lat,trans,quat,starting_angles, n_mol)
                 break
             except Exception as e:
                 print(e)
@@ -248,4 +247,4 @@ def generate_crystal(initial_structure, parameter_set, high_angle, low_angle, hi
             break
     
     print(Vmol)
-    return trial_crystal, lat, trans, q, starting_angles, n_failed
+    return trial_crystal, lat, trans, quat, starting_angles, n_failed
