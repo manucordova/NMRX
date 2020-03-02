@@ -162,16 +162,16 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
                 #     lat[2] = lat[1]
                 if 'alpha' in parameter_set:
                     lat[3] = (high_angle - low_angle) * mc.gauss_number() + low_angle
-                else:
-                    lat[3] = 90.0
+                # else:
+                #     lat[3] = 90.0
                 if 'beta' in parameter_set:
                     lat[4] = (high_angle - low_angle) * mc.gauss_number() + low_angle
-                else:
-                    lat[4] = 90.0
+                # else:
+                #     lat[4] = 90.0
                 if 'gamma' in parameter_set:
                     lat[5] = (high_angle - low_angle) * mc.gauss_number() + low_angle
-                else:
-                    lat[5] = 90.0
+                # else:
+                #     lat[5] = 90.0
 
                 if 'rot' in parameter_set:
                     quat = np.zeros(4)
