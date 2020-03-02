@@ -60,7 +60,7 @@ dftb_path = which("dftb+")
 
 # Primary parameters to change
 molecule = "cocaine"
-nloop = 10000 #after mc temperature update will become redundant though would like to set to a reasonable amount not to let loop forever
+nloop = 10000 #after mc temperature update will become redundant
 structures = 2
 simplex = False
 use_energy = True
@@ -69,35 +69,36 @@ H1 = True
 H_cutoff = 0.1
 factor = 0.005
 experiment = "1"
-comment = '_test_2'
+comment = '_test_lattice'
 # parameter_set = ['']
 # parameter_set = ['rot']
 #parameter_set = ['c']
-# parameter_set = ['a','b','c','beta']
-parameter_set = ['a','b','c','beta']
+#parameter_set = ['a','b','c','beta']
+parameter_set = ['a','b','c']
 # parameter_set = ['a','b','c','alpha','beta','gamma']
-# parameter_set = ['a','b','c','beta','trans','rot','conf']
+#parameter_set = ['a','b','c','beta','trans','rot','conf']
 # parameter_set = ['trans','rot']
 #parameter_set = ['a', 'b', 'c', 'beta', 'trans', 'rot', 'conf']
 # parameter_set = ['conf']
-directory = os.path.abspath('../data/test_cocaine_random_lat/') + "/"
+directory = os.path.abspath('../data/test_cocaine/') + "/"
 vol_high = 3.0
 
 # Secondary parameters to change
 low_angle = 45
 high_angle = 135
-low_trans = 0  # this needs to be changed later depend on the selected cell lenghts and angles
-high_trans = 7.5 * nr_molecules[choice]  # this needs to be changed later depend on the selected cell lenghts and angles
+low_trans = 0  # this needs to be changed later to depend on the selected cell lengths and angles
+high_trans = 7.5 * nr_molecules[choice]  # this needs to be changed later depend on the selected cell lengths and angles
 rotate_high = 360
 rotate_low = 0
-# rot_amplitude = 0.1
-# angle_conf = 10
-#step_list = [2.0, 2.0, 2.0, 20.0, 20.0, 20.0, 2.0]
-step_list = [15.0, 15.0, 15.0, 20.0, 20.0, 20.0, 2.0]
-naccept = 0
-use_RT = True
-T_initial = 50
-cut = 1.0 #can be done separately for H, C etc., yet to be implemented
+# rot_amplitude = 0.1 #needs to be investigated
+# angle_conf = 10 #needs to be investigated now because gave good results with +/- 180
+## [a, b, c, alpha, beta, gamma, translation, orientation, torsions]
+step_list = [15.0, 15.0, 15.0, 90.0, 90.0, 90.0, 20.0, 1.0, 180]
+#step_list = [2.0, 2.0, 2.0, 20.0, 20.0, 20.0, 2.0, 0.1, 20]
+coefficient_initial = 1.0
+T_initial = 50 #K
+#cut = 1.6 #can be done separately for H, C etc., yet to be implemented
+cut = 1.0
 
 # Slopes and offsets for conversion from shielding to shift
 slope = {}
@@ -241,7 +242,6 @@ for k in range(structures):
     sel_parameters = [0, 0, 0, 0, 0]
     acc_parameters = [0, 0, 0, 0, 0]
 
-
     #Counting how many steps are accepted and changing temperature depending on that
     accepted_steps = 0
     accepted_steps_in_a_row = 1
@@ -249,13 +249,9 @@ for k in range(structures):
     decrease_T = False
 
     T = T_initial
-    coefficient = 1.0
+    coefficient = coefficient_initial
 
     for i in range(nloop):
-
-        if accepted_steps_in_a_row == 10:
-            decrease_T = True
-
 
         if not decrease_T:
             T = T*1.05
@@ -265,10 +261,9 @@ for k in range(structures):
             if last_accepted:
                 coefficient *= 2
             else:
-                coefficient /=2
-
-        if coefficient > 1.0:
-            coefficient = 1.0
+                coefficient /= 2
+            if coefficient > 1.0:
+                coefficient = 1.0
 
         log_file = open(directory + name + '/' + experiment + '.log', "a")
         log_file.write("Structure: " + str(k) + ", loop: " + str(i) + "\n")
@@ -320,24 +315,36 @@ for k in range(structures):
                    if trial_lat[2] > 30:
                        trial_lat[2] = 30
                 if parameter == 'alpha':
-                    trial_lat[3] += step_list[3] * (2 * mc.gauss_number() - 1)
+                    trial_lat[3] += step_list[3] * (2 * mc.gauss_number() - 1) * coefficient
+                    if trial_lat[3] < 45:
+                        trial_lat[3] = 45
+                    elif trial_lat[3] > 135:
+                        trial_lat[3] = 135
                 if parameter == 'beta':
-                    trial_lat[4] += step_list[4] * (2 * mc.gauss_number() - 1)
+                    trial_lat[4] += step_list[4] * (2 * mc.gauss_number() - 1) * coefficient
+                    if trial_lat[4] < 45:
+                        trial_lat[4] = 45
+                    elif trial_lat[4] > 135:
+                        trial_lat[4] = 135
                 if parameter == 'gamma':
-                    trial_lat[5] += step_list[5] * (2 * mc.gauss_number() - 1)
+                    trial_lat[5] += step_list[5] * (2 * mc.gauss_number() - 1) * coefficient
+                    if trial_lat[5] < 45:
+                        trial_lat[5] = 45
+                    elif trial_lat[5] > 135:
+                        trial_lat[5] = 135
 
                 if parameter == 'trans':
-                    trial_trans[0] += step_list[6] * (2 * mc.gauss_number() - 1)
-                    trial_trans[1] += step_list[6] * (2 * mc.gauss_number() - 1)
-                    trial_trans[2] += step_list[6] * (2 * mc.gauss_number() - 1)
+                    trial_trans[0] += step_list[6] * (2 * mc.gauss_number() - 1) * coefficient
+                    trial_trans[1] += step_list[6] * (2 * mc.gauss_number() - 1) * coefficient
+                    trial_trans[2] += step_list[6] * (2 * mc.gauss_number() - 1) * coefficient
 
                 if parameter == 'rot':
                     for i in range(4):
-                        trial_quat[i] += rot_amplitude * (random.random() - 0.5)
+                        trial_quat[i] += step_list[7] * (random.random() - 0.5) * coefficient
                     trial_quat /= np.linalg.norm(trial_quat)
 
                 if parameter == 'conf':
-                    new_angles = mc.conf_angles(angle_conf, 'uniform')
+                    new_angles = mc.conf_angles(step_list[8]*coefficient, 'uniform')
                     trial_conf[0] += new_angles[0]
                     trial_conf[1] += new_angles[1]
                     trial_conf[2] += new_angles[2]
@@ -355,11 +362,9 @@ for k in range(structures):
                 print(e)
                 pass
 
-
         write(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif', trial_structure)
 
         if cr.check_for_overlap(trial_structure, cut, close_atoms, Vmol, vol_high):
-
 
             if H1:
                 chi = calculate_1H(trial_structure, krr, representation, trainsoaps, model_numbers, zeta, molecule)
@@ -379,14 +384,12 @@ for k in range(structures):
             else:
                 energy = 0
 
-
             accept = False
 
             if chi + chi_13C / 10.0 + factor * energy <= chi_old + chi_13C_old / 10.0 + factor * energy_old:
                 accept = True
             elif random.random() <= math.exp(
-                    (chi_old + chi_13C / 10.0 + factor * energy_old - chi - chi_13C / 10.0 - factor * energy) / (
-                            factor * 0.008314 * T)):
+                    (chi_old + chi_13C / 10.0 + factor * energy_old - chi - chi_13C / 10.0 - factor * energy) / (factor * 0.008314 * T)):
                 accept = True
 
             if accept == True:
@@ -395,8 +398,9 @@ for k in range(structures):
                 if last_accepted:
                     accepted_steps_in_a_row += 1
                 last_accepted = True
-                if accepted_steps_in_a_row == 10:
+                if accepted_steps_in_a_row == 5:
                     decrease_T = True
+
 
                 print chi, energy
                 chi_old = chi
@@ -422,17 +426,11 @@ for k in range(structures):
                 last_accepted = False
                 accepted_steps_in_a_row = 1
 
-        # else:
-        #     last_accepted = False
-        #     accepted_steps_in_a_row = 1
-
         if coefficient < 1e-4:
             break
 
         print T, accepted_steps, accepted_steps_in_a_row, coefficient
         print lat
-
-
     # #Final parameters for the MC run
     # accepted_chi_list = np.array(accepted_chi_list)
     # accepted_energy_list = np.array(accepted_energy_list)
