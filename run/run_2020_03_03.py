@@ -57,28 +57,31 @@ def which(pgm):
 
 
 dftb_path = which("dftb+")
+cluster = False
 
 # Primary parameters to change
 molecule = "cocaine"
 nloop = 10000 #after mc temperature update will become redundant
-structures = 2
+structures = 5
 simplex = False
 use_energy = True
 C13 = False  # Not yet implemented for azd #think about including for bigger molecules like ritonavir
 H1 = True
 H_cutoff = 0.1
-factor = 0.005
+H_factor = 200.0
+C_factor = 0.0
 experiment = "1"
 comment = '_test_lattice'
+write_intermediates = False
 # parameter_set = ['']
 # parameter_set = ['rot']
 #parameter_set = ['c']
 #parameter_set = ['a','b','c','beta']
-parameter_set = ['a','b','c']
+#parameter_set = ['a','b','c']
 # parameter_set = ['a','b','c','alpha','beta','gamma']
 #parameter_set = ['a','b','c','beta','trans','rot','conf']
 # parameter_set = ['trans','rot']
-#parameter_set = ['a', 'b', 'c', 'beta', 'trans', 'rot', 'conf']
+parameter_set = ['a', 'b', 'c', 'beta', 'trans', 'rot', 'conf']
 # parameter_set = ['conf']
 directory = os.path.abspath('../data/test_cocaine/') + "/"
 vol_high = 3.0
@@ -93,10 +96,10 @@ rotate_low = 0
 # rot_amplitude = 0.1 #needs to be investigated
 # angle_conf = 10 #needs to be investigated now because gave good results with +/- 180
 ## [a, b, c, alpha, beta, gamma, translation, orientation, torsions]
-step_list = [15.0, 15.0, 15.0, 90.0, 90.0, 90.0, 20.0, 1.0, 180]
+step_list = [5.0, 5.0, 5.0, 10.0, 10.0, 10.0, 5.0, 0.5, 10]
 #step_list = [2.0, 2.0, 2.0, 20.0, 20.0, 20.0, 2.0, 0.1, 20]
 coefficient_initial = 1.0
-T_initial = 50 #K
+T_initial = 300 #K
 #cut = 1.6 #can be done separately for H, C etc., yet to be implemented
 cut = 1.0
 
@@ -130,7 +133,7 @@ except:
     pass
 
 if use_energy:
-    name = str(nloop) + "_loops_" + str(factor) + '_factor_' + "_H1_" + str(H1) + \
+    name = str(nloop) + "_loops_" + str(H_factor) + '_factor_' + "_H1_" + str(H1) + \
            "_C13_" + str(C13) + str(comment) + "_" + experiment
 else:
     name = str(nloop) + "_loops_" + "_H1_" + str(H1) + \
@@ -158,8 +161,8 @@ initial_structure = directory + name + '/' + str(number) + '.pdb'
 def calculate_1H(trial_crystal, krr, representation, trainsoaps, model_numbers, zeta, molecule):
     y_pred = ml.predict_shifts([trial_crystal], krr, representation, trainsoaps, model_numbers, zeta, sp=1)
     y_pred, y_exp = ml.exp_rmsd(y_pred, molecule=molecule)
-    chi = ml.rmsd(y_exp, y_pred, offset["H"], slope["H"])
-    return chi
+    chi_1H = ml.rmsd(y_exp, y_pred, offset["H"], slope["H"])
+    return chi_1H
 
 
 # def calculate_C13(trial_crystal, krr_13C, representation_13C, trainsoaps_13C, model_numbers_13C, zeta_13C, molecule):
@@ -208,13 +211,15 @@ for k in range(structures):
     write(directory + name + '/' + experiment + "_" + str(k) + '_init_structure.cif', trial_crystal)
     print("Reasonable structure found after {} tries!".format(n_failed))
 
+    all_costs = []
+    all_chi_H = []
 
     # 1H RMSE for the initial randomly generated crystal
     if H1:
-        chi = calculate_1H(trial_crystal, krr, representation, trainsoaps, model_numbers, zeta, molecule)
-        print chi
+        chi_1H = calculate_1H(trial_crystal, krr, representation, trainsoaps, model_numbers, zeta, molecule)
+        print chi_1H
     else:
-        chi = 0
+        chi_1H = 0
     # 13C RMSE for the initial randomly generated crystal
     if C13:
         chi_13C = calculate_C13(trial_crystal, krr_13C, representation_13C, trainsoaps_13C, model_numbers_13C, zeta_13C,
@@ -223,7 +228,12 @@ for k in range(structures):
         chi_13C = 0
     # Energy calculation for the initial randomly generated crystal
     if use_energy:
-        energy = dftb.dftbplus_energy(directory + name + '/',
+        if cluster:
+            energy = dftb.dftbplus_energy('/dev/shm/',
+                                      directory + name + '/' + experiment + "_" + str(k) + '_init_structure.cif',
+                                      dftb_path, dispersion="D3") * 2625.50 + energy_constant
+        else:
+            energy = dftb.dftbplus_energy(directory + name + '/',
                                       directory + name + '/' + experiment + "_" + str(k) + '_init_structure.cif',
                                       dftb_path, dispersion="D3") * 2625.50 + energy_constant
         print energy
@@ -231,9 +241,9 @@ for k in range(structures):
         energy = 0
 
     # Saving the starting parameters
-    chi_old = chi
-    chi_13C_old = chi_13C
-    energy_old = energy
+    
+    cost_old = chi_1H * H_factor + chi_13C * C_factor + energy
+    cost = cost_old
 
     trial_conf = [0, 0, 0, 0, 0, 0]
     trial_conf_old = [0, 0, 0, 0, 0, 0]
@@ -362,37 +372,45 @@ for k in range(structures):
                 print(e)
                 pass
 
-        write(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif', trial_structure)
+        if write_intermediates:
+            write(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif', trial_structure)
 
         if cr.check_for_overlap(trial_structure, cut, close_atoms, Vmol, vol_high):
 
             if H1:
-                chi = calculate_1H(trial_structure, krr, representation, trainsoaps, model_numbers, zeta, molecule)
+                chi_1H = calculate_1H(trial_structure, krr, representation, trainsoaps, model_numbers, zeta, molecule)
             else:
-                chi = 0
+                chi_1H = 0.
 
             if C13:
                 chi_13C = calculate_C13(trial_structure, krr_13C, representation_13C, trainsoaps_13C, model_numbers_13C,
                                         zeta_13C, molecule)
             else:
-                chi_13C = 0
+                chi_13C = 0.
 
             if use_energy:
-                energy = dftb.dftbplus_energy(directory + name + '/',
+                if cluster:
+                    energy = dftb.dftbplus_energy('/dev/shm/',
+                                              directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif',
+                                              dftb_path, dispersion="D3") * 2625.50 + energy_constant
+                
+                else:
+                    energy = dftb.dftbplus_energy(directory + name + '/',
                                               directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif',
                                               dftb_path, dispersion="D3") * 2625.50 + energy_constant
             else:
-                energy = 0
+                energy = 0.
 
             accept = False
+            
+            cost = chi_1H * H_factor + chi_13C * C_factor + energy
 
-            if chi + chi_13C / 10.0 + factor * energy <= chi_old + chi_13C_old / 10.0 + factor * energy_old:
+            if cost < cost_old:
                 accept = True
-            elif random.random() <= math.exp(
-                    (chi_old + chi_13C / 10.0 + factor * energy_old - chi - chi_13C / 10.0 - factor * energy) / (factor * 0.008314 * T)):
+            elif random.random() <= math.exp((cost_old - cost)/(0.008314*T)):
                 accept = True
 
-            if accept == True:
+            if accept:
 
                 accepted_steps += 1
                 if last_accepted:
@@ -400,12 +418,8 @@ for k in range(structures):
                 last_accepted = True
                 if accepted_steps_in_a_row == 5:
                     decrease_T = True
+                cost_old = cost
 
-
-                print chi, energy
-                chi_old = chi
-                chi_13C_old = chi_13C
-                energy_old = energy
                 lat = copy.deepcopy(trial_lat)
                 trans = copy.deepcopy(trial_trans)
                 quat = copy.deepcopy(trial_quat)
@@ -434,15 +448,19 @@ for k in range(structures):
             break
 
         print T, accepted_steps, accepted_steps_in_a_row, coefficient
+        all_costs.append(cost)
+        all_chi_H.append(chi_1H)
         print lat
     # #Final parameters for the MC run
     # accepted_chi_list = np.array(accepted_chi_list)
     # accepted_energy_list = np.array(accepted_energy_list)
     # np.save(directory + name + '/' + str(k) + '_accepted_chi_list.npy', accepted_chi_list)
     # np.save(directory + name + '/' + str(k) + '_accepted_energy_list.npy', accepted_energy_list)
-    final_parameters = [chi_old, energy_old]
+    final_parameters = [chi_1H, energy]
     final_parameters = np.array(final_parameters)
     np.save(directory + name + '/' + experiment + "_" + str(k) + '_final_parameters.npy', final_parameters)
+    np.save(directory + name + '/' + experiment + "_" + str(k) + '_costs.npy', all_costs)
+    np.save(directory + name + '/' + experiment + "_" + str(k) + '_1H_chis.npy', all_chi_H)
 
     dat = np.array([sel_parameters, acc_parameters])
     dat = dat.T
@@ -554,7 +572,7 @@ for k in range(structures):
 
 
         def optimisation_function(guess, constants, guess_names, constants_names, all_param_names, starting, sg, atoms,
-                                  sites, H1, use_energy, factor, krr, representation, trainsoaps, model_numbers,
+                                  sites, H1, use_energy, H_factor, krr, representation, trainsoaps, model_numbers,
                                   zeta, molecule, directory, name, experiment, k, energy_constant):
 
             # Make a list of the parameters
@@ -600,12 +618,17 @@ for k in range(structures):
 
             # Compute shifts and H_rmse
             if H1:
-                chi = calculate_1H(trial_structure, krr, representation, trainsoaps, model_numbers, zeta, molecule)
+                chi_1H = calculate_1H(trial_structure, krr, representation, trainsoaps, model_numbers, zeta, molecule)
             else:
-                chi = 0
+                chi_1H = 0
 
             if use_energy:
-                energy = dftb.dftbplus_energy(directory + name + '/',
+                if cluster:
+                    energy = dftb.dftbplus_energy('/dev/shm/',
+                                              directory + name + '/' + experiment + "_" + str(k) + '_opt_structure.cif',
+                                              dftb_path, dispersion="D3") * 2625.50 + energy_constant
+                else:
+                    energy = dftb.dftbplus_energy(directory + name + '/',
                                               directory + name + '/' + experiment + "_" + str(k) + '_opt_structure.cif',
                                               dftb_path, dispersion="D3") * 2625.50 + energy_constant
             else:
@@ -616,17 +639,17 @@ for k in range(structures):
             # np.save(directory + name + '/' + experiment + "_" + str(k) + '_opt_chi.npy', chi_save)
             # np.save(directory + name + '/' + experiment + "_" + str(k) + '_opt_energy.npy', energy_save)
 
-            final_parameters = [chi, energy]
+            final_parameters = [chi_1H, energy]
             final_parameters = np.array(final_parameters)
             np.save(directory + name + '/' + experiment + "_" + str(k) + '_final_opt_parameters.npy', final_parameters)
 
-            print energy, chi
+            print cost
 
-            return chi + factor * energy
+            return chi_1H + H_factor * energy
 
 
         res = op.minimize(optimisation_function, guess, args=(
-        constants, guess_names, constants_names, all_param_names, starting, sg, atoms, sites, H1, use_energy, factor,
+        constants, guess_names, constants_names, all_param_names, starting, sg, atoms, sites, H1, use_energy, H_factor,
         krr, representation, trainsoaps, model_numbers,
         zeta, molecule, directory, name, experiment, k, energy_constant), method='Nelder-Mead', tol=1e-2,
                           options={'fatol': 1e-2})
