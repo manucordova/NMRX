@@ -72,7 +72,6 @@ H_factor = 200.0
 C_factor = 0.0
 experiment = "1"
 comment = '_test_lattice'
-write_intermediates = False
 # parameter_set = ['']
 # parameter_set = ['rot']
 #parameter_set = ['c']
@@ -372,8 +371,7 @@ for k in range(structures):
                 print(e)
                 pass
 
-        if write_intermediates:
-            write(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif', trial_structure)
+        write(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif', trial_structure)
 
         if cr.check_for_overlap(trial_structure, cut, close_atoms, Vmol, vol_high):
 
