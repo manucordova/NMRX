@@ -25,9 +25,7 @@ def compute_s_values(k_points):
     return s_values
 
 
-def make_dftb_input(file, k_points_factor, skfdir, outdir, dispersion):
-    xyz = ase.io.read(file, index=-1)
-    name = file.split('.')[0]
+def make_dftb_input(xyz, k_points_factor, skfdir, outdir, dispersion):
     pos = xyz.get_positions()
     nr = xyz.get_number_of_atoms()
     typ = xyz.get_chemical_symbols()
@@ -102,11 +100,11 @@ def make_dftb_input(file, k_points_factor, skfdir, outdir, dispersion):
         f.write(pp)
 
 
-def dftbplus_energy(directory, filename, dftb_path, dispersion="D3"):
+def dftbplus_energy(directory, struct, dftb_path, dispersion="D3"):
     """
     DFTB+ full energy computation
 
-    Options:    filename = "<path_to_file>" crystal structure to compute the energy for
+    Options:    struct = ase.Atoms object. Crystal structure to compute the energy for
                 fileformat = "cif", "xyz", ... (any format valid for ASE)
                 dispersion = "D3", "LJ", "None"
     """
@@ -119,7 +117,7 @@ def dftbplus_energy(directory, filename, dftb_path, dispersion="D3"):
 
     k_points_factor = 0.06  # Length for k-point sampling in reciprocal space (A^-1)
 
-    make_dftb_input(filename, k_points_factor, skfdir, outdir, dispersion)
+    make_dftb_input(struct, k_points_factor, skfdir, outdir, dispersion)
 
     os.chdir(outdir)
     process = sp.Popen(dftb_path, stdout=sp.PIPE)

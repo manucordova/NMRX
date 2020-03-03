@@ -72,6 +72,7 @@ H_factor = 200.0
 C_factor = 0.0
 experiment = "1"
 comment = '_test_lattice'
+write_intermediates = False
 # parameter_set = ['']
 # parameter_set = ['rot']
 #parameter_set = ['c']
@@ -228,13 +229,9 @@ for k in range(structures):
     # Energy calculation for the initial randomly generated crystal
     if use_energy:
         if cluster:
-            energy = dftb.dftbplus_energy('/dev/shm/',
-                                      directory + name + '/' + experiment + "_" + str(k) + '_init_structure.cif',
-                                      dftb_path, dispersion="D3") * 2625.50 + energy_constant
+            energy = dftb.dftbplus_energy('/dev/shm/', trial_crystal, dftb_path, dispersion="D3") * 2625.50 + energy_constant
         else:
-            energy = dftb.dftbplus_energy(directory + name + '/',
-                                      directory + name + '/' + experiment + "_" + str(k) + '_init_structure.cif',
-                                      dftb_path, dispersion="D3") * 2625.50 + energy_constant
+            energy = dftb.dftbplus_energy(directory + name + '/', trial_crystal, dftb_path, dispersion="D3") * 2625.50 + energy_constant
         print energy
     else:
         energy = 0
@@ -370,8 +367,9 @@ for k in range(structures):
             except Exception as e:
                 print(e)
                 pass
-
-        write(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif', trial_structure)
+        
+        if write_intermediates:
+            write(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif', trial_structure)
 
         if cr.check_for_overlap(trial_structure, cut, close_atoms, Vmol, vol_high):
 
@@ -388,14 +386,10 @@ for k in range(structures):
 
             if use_energy:
                 if cluster:
-                    energy = dftb.dftbplus_energy('/dev/shm/',
-                                              directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif',
-                                              dftb_path, dispersion="D3") * 2625.50 + energy_constant
+                    energy = dftb.dftbplus_energy('/dev/shm/', trial_structure, dftb_path, dispersion="D3") * 2625.50 + energy_constant
                 
                 else:
-                    energy = dftb.dftbplus_energy(directory + name + '/',
-                                              directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif',
-                                              dftb_path, dispersion="D3") * 2625.50 + energy_constant
+                    energy = dftb.dftbplus_energy(directory + name + '/', trial_structure, dftb_path, dispersion="D3") * 2625.50 + energy_constant
             else:
                 energy = 0.
 
@@ -622,13 +616,9 @@ for k in range(structures):
 
             if use_energy:
                 if cluster:
-                    energy = dftb.dftbplus_energy('/dev/shm/',
-                                              directory + name + '/' + experiment + "_" + str(k) + '_opt_structure.cif',
-                                              dftb_path, dispersion="D3") * 2625.50 + energy_constant
+                    energy = dftb.dftbplus_energy('/dev/shm/', trial_structure, dftb_path, dispersion="D3") * 2625.50 + energy_constant
                 else:
-                    energy = dftb.dftbplus_energy(directory + name + '/',
-                                              directory + name + '/' + experiment + "_" + str(k) + '_opt_structure.cif',
-                                              dftb_path, dispersion="D3") * 2625.50 + energy_constant
+                    energy = dftb.dftbplus_energy(directory + name + '/', trial_structure, dftb_path, dispersion="D3") * 2625.50 + energy_constant
             else:
                 energy = 0
 
