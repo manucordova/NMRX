@@ -61,7 +61,7 @@ cluster = False
 
 # Primary parameters to change
 molecule = "cocaine"
-nloop = 10000 #after mc temperature update will become redundant
+nloop = 10 #after mc temperature update will become redundant
 structures = 5
 simplex = False
 use_energy = True
@@ -465,7 +465,8 @@ for k in range(structures):
     final_structure = cr.create_crystal(starting_copy, molecule, sg, atoms, sites, lat, trans, quat, final_angles,
                                         nr_molecules[choice])
     write(directory + name + '/' + experiment + "_" + str(k) + '_structure.cif', final_structure)
-    os.remove(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif')
+    if write_intermediates:
+        os.remove(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif')
 
     if simplex:
 
