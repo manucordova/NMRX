@@ -136,6 +136,6 @@ def dftbplus_energy(directory, struct, dftb_path, dispersion="D3"):
 # E= dftbplus_energy("/Users/balodis/work/ritonavir/structure_files/Ritonavir_reordered/", "/Users/balodis/work/ritonavir/structure_files/Ritonavir_reordered/Ritonavir_polymorph_2_DFTB_vc-relax.cif", dispersion="D3")*2625.50
 #
 #
-# #E = dftbplus_energy("/Users/balodis/work/ritonavir/results/2020/ritonavir_conf_const_test/4000_loops_0.005_factor__H1_True_C13_False_test_1/","/Users/balodis/work/ritonavir/results/2020/ritonavir_conf_const_test/4000_loops_0.005_factor__H1_True_C13_False_test_1/1_0_opt_structure.cif", dispersion="D3")*2625.50
+# E = dftbplus_energy("/Users/balodis/work/ritonavir/results/2020/ritonavir_conf_const_test/4000_loops_0.005_factor__H1_True_C13_False_test_1/","/Users/balodis/work/ritonavir/results/2020/ritonavir_conf_const_test/4000_loops_0.005_factor__H1_True_C13_False_test_1/1_0_opt_structure.cif", dispersion="D3")*2625.50
 # print(E)
 
