@@ -60,10 +60,10 @@ dftb_path = which("dftb+")
 cluster = False
 
 # Primary parameters to change
-molecule = "cocaine"
-nloop = 10 #after mc temperature update will become redundant
-structures = 5
-simplex = False
+molecule = "azd"
+nloop = 1 #after mc temperature update will become redundant
+structures = 1
+simplex = True
 use_energy = True
 C13 = False  # Not yet implemented for azd #think about including for bigger molecules like ritonavir
 H1 = True
@@ -77,11 +77,11 @@ write_intermediates = False
 # parameter_set = ['rot']
 #parameter_set = ['c']
 #parameter_set = ['a','b','c','beta']
-#parameter_set = ['a','b','c']
+parameter_set = ['a','b','c']
 # parameter_set = ['a','b','c','alpha','beta','gamma']
 #parameter_set = ['a','b','c','beta','trans','rot','conf']
 # parameter_set = ['trans','rot']
-parameter_set = ['a', 'b', 'c', 'beta', 'trans', 'rot', 'conf']
+#parameter_set = ['a', 'b', 'c','alpha','beta','gamma' 'trans', 'rot']
 # parameter_set = ['conf']
 directory = os.path.abspath('../data/test_cocaine/') + "/"
 vol_high = 3.0
@@ -573,6 +573,7 @@ for k in range(structures):
             ind_guess = 0
             ind_const = 0
             for param in all_param_names:
+                print param
                 if param in guess_names:
                     if param == "conf":
                         if param in guess_names[:-1]:
@@ -590,7 +591,7 @@ for k in range(structures):
                         all_params.append(constants[ind_const])
                         ind_const += 1
 
-            # print all_params
+            print all_params
 
             # Load a structure and apply the parameters
             starting_copy = copy.deepcopy(starting)

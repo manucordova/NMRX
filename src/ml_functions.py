@@ -70,6 +70,7 @@ def predict_shifts(frames_test, krrs, representation, trainsoaps, model_numbers,
 # here we average the methyls (and count them 1 time), the CH2 protons are assigned as best match in the individual groups
 def exp_rmsd(y_calc,molecule="cocaine"):
 
+
     if molecule=="cocaine":
         y_exp = [3.76, 3.78, 5.63,
                  3.49, 3.06,
@@ -116,47 +117,6 @@ def exp_rmsd(y_calc,molecule="cocaine"):
             y_sort.append(np.mean(y_sel))
 
 
-    if molecule == "azd":
-        y_exp = [6.92,
-                 8.69,
-                 9.01,
-                 8.47,
-                 15.37,
-                 7.73,
-                 9.64,
-                 2.90,
-                 1.78,
-                 1.88,
-                 1.88,
-                 1.8,
-                 1.6,
-                 0.44,
-                 1.54,
-                 1.88,
-                 1.88,
-                 0.8,
-                 0.8,
-                 1.0,
-                 1.74,
-                 1.74,
-                 0.73,
-                 0.73,
-                 0.73]
-
-        y_calc = np.array(y_calc[0:len(y_calc) / 2])
-
-        y_sort = []
-        for k1 in range(22):
-            y_sort.append(y_calc[k1])
-        y_sel = y_calc[22:25]
-        for k1 in range(1):
-            y_sort.append(np.mean(y_sel))
-        y_sel = y_calc[25:28]
-        for k1 in range(1):
-            y_sort.append(np.mean(y_sel))
-        y_sel = y_calc[28:31]
-        for k1 in range(1):
-            y_sort.append(np.mean(y_sel))
 
     if molecule == "azd":
         y_exp = [6.92,
@@ -218,7 +178,8 @@ def exp_rmsd(y_calc,molecule="cocaine"):
                   ar_av, ar_av, ar_av, ar_av, ar_av,
                   np.mean([y_calc[3], y_calc[4]]), np.mean([y_calc[3], y_calc[4]]), y_calc[5], y_calc[6]]
 
-        # Experimental shifts
+
+        #Experimental shifts ordered, calibrated
         y_exp = [1.24,3.33,0.78,
                 5.11,2.46,
                  np.mean([3.47,5.67]),np.mean([3.47,5.67]),
@@ -228,6 +189,7 @@ def exp_rmsd(y_calc,molecule="cocaine"):
                 4.03,4.51,np.mean([1.28,3.12]),np.mean([1.28,3.12]),
                 6.88,6.88,6.88,6.88,6.88,
                 4.19,4.19,7.43,8.36]
+
 
     return np.array(y_sort), np.array(y_exp)
 
@@ -274,13 +236,16 @@ def exp_rmsd_13C(molecule="cocaine"):
 
 ##Testing
 #Test
+# slope = {}
+# offset = {}
+# slope["H"] = 1.0
+# offset["H"] = 30.36
+# # np_load_old = np.load
+# # np.load = lambda *a,**k: np_load_old(*a, allow_pickle=True, **k)
 # krr, representation, trainsoaps, model_numbers, zeta = load_kernel(1)
-#
-# xyz = read("/Users/balodis/work/cocaine/structure_files/COCAIN10_H_relaxed_out_cell.pdb")
+# #
+# xyz = read('../input_structures/azd8329/azd8329_csp.vc-relax.pdb')
 # y_pred = predict_shifts([xyz], krr, representation, trainsoaps, model_numbers, zeta, sp=1)
-# y_sort, y_exp = exp_rmsd(y_pred)
-# #popt, pcov = op.curve_fit(lin,y_sort,y_exp)
-# #rmsd = np.sqrt( sum( (y_exp-lin(y_sort,*popt))**2 )/len(y_sort) )
-# rms = rmsd(y_sort,y_exp)
-# print rms
-
+# y_pred, y_exp = exp_rmsd(y_pred, molecule='azd')
+# chi_1H = rmsd(y_exp, y_pred, offset["H"], slope["H"])
+# print chi_1H

@@ -116,10 +116,16 @@ def get_projections(struct, alpha, beta, gamma, atoms, quat):
     
     return [la, lb, lc]
 
-def check_for_overlap(trial_crystal, cut, close_atoms, Vmol, vol_high):
+
+
+def check_for_overlap(trial_crystal, cut, close_atoms, Vmol, vol_high,old_overlap=False):
     """
     """
-    overlapping_atoms = get_close_atoms(trial_crystal, cutoff=cut)
+    if old_overlap==False:
+        overlapping_atoms = get_close_atoms(trial_crystal, cutoff=cut)
+    else:
+        overlapping_atoms = ase.geometry.get_duplicate_atoms(trial_crystal, cutoff=cut, delete=False)
+
     count = 0
     for aa in overlapping_atoms:
         for bb in close_atoms:
@@ -134,7 +140,7 @@ def check_for_overlap(trial_crystal, cut, close_atoms, Vmol, vol_high):
 
 Vs = []
 
-def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans, low_trans, rotate_high, rotate_low, sg, atoms, n_mol, molecule, cut, close_atoms, vol_high):
+def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans, low_trans, rotate_high, rotate_low, sg, atoms, n_mol, molecule, cut, close_atoms, vol_high,old_overlap=False):
     
     # Calculate the volume of the molecule
     nr = starting.get_atomic_numbers()[:atoms]
@@ -242,9 +248,8 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
         Vs.append(trial_crystal.get_volume())
 
         # Check if the generated cell is good, if not, try again
-        if check_for_overlap(trial_crystal,cut,close_atoms,Vmol,vol_high):
-            print(trial_crystal.get_volume())
+        if check_for_overlap(trial_crystal,cut,close_atoms,Vmol,vol_high,old_overlap):
+            print "Cell relative volume: " + str((trial_crystal.get_volume())/Vmol)
             break
-    
-    print(Vmol)
+
     return trial_crystal, lat, trans, quat, starting_angles, n_failed

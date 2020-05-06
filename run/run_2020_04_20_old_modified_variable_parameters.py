@@ -1,108 +1,107 @@
 ##
-# Last modified 03.23.2020
-# Inclusion of Ritonavir, first iteration
-# All possible changes are included. First the reference structure is always loaded and then randomized.
-# Set up for cocaine and azd8329
-# One can also load a different conformation, by rewriting the conformation in the reference structure. 1H, 13C and
-# DFTB can be included or excluded. Temperature gradient can be turned on or off.
-# If new 1H chi < H_cutoff, then it is set to old 1H chi
-# If new 13H chi < 4.3, then it is set to old 1H chi
-# Adding simplex optimisation at the end
-# Included rotations for azd
+#Last modified 30.03.2020
+#Changed all starting copies to make sure nothing is overwriten
 
-
-# Initialization, numerical analysis and system tools
+##
+#Initialization, numerical analysis and system tools
 import numpy as np
 import math
-import sys, os
+import sys,os
 import random
 import copy
 import time
 import scipy.optimize as op
 from shutil import copyfile
 
-# Atomic simulation environment
+#Atomic simulation environment
 import ase
-from ase.io import read, write
+from ase.io import read,write
 from ase.visualize import view
 from ase.build import minimize_rotation_and_translation
 from ase.spacegroup import crystal
 from ase.data import chemical_symbols
 from ase.data import atomic_numbers, vdw_radii
 
-# Paths used for different system modules
-sys.path.insert(0, "../src")
-import mc_functions as mc
-import ml_functions as ml
-import generate_crystals as cr
-import dftb as dftb
 
+#Paths used for different system modules
+sys.path.insert(0, "../src")
+import mc_functions_v2 as mc
+import ml_functions as ml
+import dftb_v2 as dftb
+import generate_crystals as cr
+
+
+# np_load_old = np.load
+# np.load = lambda *a,**k: np_load_old(*a, allow_pickle=True, **k)
+
+##
 random.seed()
 
-# The choice of the space group
+#The choice of the space group
 choice = 3
-space_groups = [14, 19, 2, 4, 61, 115, 33, 9, 29, 5]
-nr_molecules = [4, 4, 2, 2, 8, 4, 4, 2, 4, 2]
-space_group_sym = ["M", "O", "Triclinic", "M", "O", "Tetragonal", "O", "M", "O", "M"]
+space_groups = [14,19,2,4,61,115,33,9,29,5]
+nr_molecules = [4,4,2,2,8,4,4,2,4,2]
+space_group_sym = ["M","O","Triclinic","M","O","Tetragonal","O","M","O","M"]
 sg = space_groups[choice]
+n_mol = nr_molecules[choice]
 
 
-# def select_space_group(choice) -> return sg, sym, n_mol
+#Finding dftb+ path on the local machine
 def which(pgm):
     path = os.getenv('PATH')
     for p in path.split(os.path.pathsep):
         p = os.path.join(p, pgm)
         if os.path.exists(p) and os.access(p, os.X_OK):
             return p
-
-
 dftb_path = which("dftb+")
+
 cluster = False
 
 # Primary parameters to change
 molecule = "cocaine"
-nloop = 10000 #after mc temperature update will become redundant
-structures = 999
-simplex = False
+nloop = 9999
+structures = 2
+
+simplex = True
 use_energy = True
-C13 = False  # Not yet implemented for azd #think about including for bigger molecules like ritonavir
+C13 = False #Not yet implemented for azd #think about including for bigger molecules like ritonavir
 H1 = False
-H_cutoff = 0.1
-H_factor = 200.0
-C_factor = 0.0
+H_cutoff= 0.1
+#rotation_cycles = 10
+factor = 0.005
 experiment = "1"
 comment = '_test'
-write_intermediates = False
-# parameter_set = ['']
-# parameter_set = ['rot']
+#parameter_set = ['']
+#parameter_set = ['rot']
 #parameter_set = ['c']
 #parameter_set = ['a','b','c','beta']
-#parameter_set = ['a','b','c']
-# parameter_set = ['a','b','c','alpha','beta','gamma']
 #parameter_set = ['a','b','c','beta','trans','rot','conf']
-# parameter_set = ['trans','rot']
-parameter_set = ['a', 'b', 'c', 'beta', 'trans', 'rot']
-# parameter_set = ['conf']
-directory = os.path.abspath('../data/test_cocaine/') + "/"
+#parameter_set = ['a','b','c','alpha','beta','gamma']
+parameter_set = ['a','b','c','beta','trans','rot']
+#parameter_set = ['trans','rot']
+#parameter_set = ['a','b','c','beta','trans','rot']
+#parameter_set = ['conf']
+directory = os.path.abspath('../data/test/') + "/"
 vol_high = 3.0
 
+
 # Secondary parameters to change
+low_len = 2.0*nr_molecules[choice] #this needs to be changed later depending on the projections of the molecule
+high_len = 7.5*nr_molecules[choice] #this needs to be changed later depending on the projections of the molecule
 low_angle = 45
 high_angle = 135
-low_trans = 0  # this needs to be changed later to depend on the selected cell lengths and angles
-high_trans = 7.5 * nr_molecules[choice]  # this needs to be changed later depend on the selected cell lengths and angles
-rotate_high = 360
-rotate_low = 0
-# rot_amplitude = 0.1 #needs to be investigated
-# angle_conf = 10 #needs to be investigated now because gave good results with +/- 180
-## [a, b, c, alpha, beta, gamma, translation, orientation, torsions]
-step_list = [15.0, 15.0, 15.0, 90.0, 90.0, 90.0, 20.0, 1.0, 180]
-#step_list = [2.0, 2.0, 2.0, 20.0, 20.0, 20.0, 2.0, 0.1, 20]
+low_trans = 0 #this needs to be changed later depend on the selected cell lenghts and angles
+high_trans = 7.5*nr_molecules[choice] #this needs to be changed later depend on the selected cell lenghts and angles
+step_list = [20.0, 20.0, 20.0, 40.0, 40.0, 40.0, 20.0, 1.0, 180.0]
+#step_list = [4.0, 4.0, 4.0, 20.0, 20.0, 20.0, 2.0]
+naccept = 0
+# use_RT = True
+# RT_start = 0.1
+# RT_end = 0.01
+cut = 1.6
+write_intermediates = False
+T_initial = 2000
 coefficient_initial = 1.0
-T_initial = 300 #K
-#cut = 1.6 #can be done separately for H, C etc., yet to be implemented
-cut = 1.0
-
 
 # Slopes and offsets for conversion from shielding to shift
 slope = {}
@@ -110,8 +109,10 @@ offset = {}
 slope["H"] = 1.
 offset["H"] = 30.36
 
-# energy_constant = 1233197.53153
-energy_constant = 0
+
+energy_constant = 0 #1233197.53153
+
+#initial_structure_original = os.path.abspath("../input_structures/{}/{}.pdb".format(molecule, molecule))
 
 if molecule == "cocaine":
     initial_structure_original = '../input_structures/cocaine/COCAIN10_H_relaxed_out_cell_vc-relax_DFTBplus.pdb'
@@ -123,8 +124,26 @@ if molecule == "azd":
     # energy_constant = 376543
 if molecule == "ritonavir":  # space group 19
     initial_structure_original = '../input_structures/ritonavir/Ritonavir_polymorph_2_DFTB_vc-relax.pdb'
-    # initial_structure_original = root + '/balodis/work/ritonavir/structure_files/Ritonavir_polymorph_2_DFTB_vc-relax.pdb'
     atoms = 98
+
+# def nonlinspace(start, stop, num,curv):
+#     linear = np.linspace(0, 1, num)
+#     curve = 1 - np.exp(-curv*linear)
+#     curve = curve/np.max(curve)
+#     curve  = curve*(stop - start) + start
+#     return curve
+
+# def nonlinspace(start,stop,num,exp):
+#     curve = []
+#     linear = np.linspace(0, 1.0, num)
+#     for elem in linear:
+#         curve.append((1-(elem)**exp)*(start-stop)+stop)
+#     return curve
+
+# if use_RT:
+#     RT_list = nonlinspace(RT_start, RT_end, nloop, 5)
+# else:
+#     RT_list = np.linspace(0.001, 0.001, nloop)
 
 try:
     os.mkdir(directory)
@@ -132,32 +151,36 @@ except:
     pass
 
 if use_energy:
-    name = str(nloop) + "_loops_" + str(H_factor) + '_factor_' + "_H1_" + str(H1) + \
-           "_C13_" + str(C13) + str(comment) + "_" + experiment
+    name = str(nloop) + "_loops_" + str(factor)+ '_factor_' + "_H1_" + str(H1) + \
+       "_C13_" + str(C13) +str(comment)+"_"+experiment
 else:
     name = str(nloop) + "_loops_" + "_H1_" + str(H1) + \
-           "_C13_" + str(C13) + str(comment) + "_" + experiment
+       "_C13_" + str(C13) +str(comment)+"_"+experiment
 
 try:
     os.mkdir(directory + name)
 except:
     pass
 
-# Loading of the kernel
+#Loading of the kernel
 krr, representation, trainsoaps, model_numbers, zeta = ml.load_kernel(1)
 if C13:
     krr_13C, representation_13C, trainsoaps_13C, model_numbers_13C, zeta_13C = ml.load_kernel(6)
 
+print ""
 
+#Copy the initial structure
+number = random.random()
+copyfile(initial_structure_original, directory + name + '/'+str(number)+'.pdb')
+initial_structure = directory + name + '/'+str(number)+'.pdb'
+starting_structure = read(initial_structure)
+starting = copy.deepcopy(starting_structure)
 
-
-
-def calculate_1H(trial_crystal, krr, representation, trainsoaps, model_numbers, zeta, molecule):
+def calculate_1H(trial_crystal,krr,representation,trainsoaps,model_numbers,zeta,molecule):
     y_pred = ml.predict_shifts([trial_crystal], krr, representation, trainsoaps, model_numbers, zeta, sp=1)
-    y_pred, y_exp = ml.exp_rmsd(y_pred, molecule=molecule)
+    y_pred, y_exp = ml.exp_rmsd(y_pred,molecule=molecule)
     chi_1H = ml.rmsd(y_exp, y_pred, offset["H"], slope["H"])
     return chi_1H
-
 
 # def calculate_C13(trial_crystal, krr_13C, representation_13C, trainsoaps_13C, model_numbers_13C, zeta_13C, molecule):
 #     y_pred = ml.predict_shifts([trial_crystal], krr_13C, representation_13C, trainsoaps_13C, model_numbers_13C, zeta_13C, sp=6)
@@ -165,109 +188,106 @@ def calculate_1H(trial_crystal, krr, representation, trainsoaps, model_numbers, 
 #     chi_13C = ml.rmsd(y_pred[:17],y_exp)
 #     return chi_13C
 
+# Get the molecular volume
+nr = starting.get_atomic_numbers()[:atoms]
+rad = np.zeros(len(nr))
+for l1 in range(0, len(rad)):
+    rad[l1] = 3.0 / 4.0 * np.pi * vdw_radii[nr[l1]] ** 3
+Vmol = sum(rad) * nr_molecules[choice]
 
-##
+# Get the lattice parameters and sites from the reference structure
+lat = starting.get_cell_lengths_and_angles()
+sites = starting.get_chemical_symbols()
+
+# Creation of a big unit cell to extract intraatomic distances that are later used to confirm that no other short distances have been created
+big_crystal = cr.create_crystal(starting, molecule, sg, atoms, sites, [400., 400., 400., 90., 90., 90.],
+                                [100, 100, 100],
+                                [1, 0, 0, 0], [0, 0, 0, 0, 0, 0], nr_molecules[choice])
+close_atoms = ase.geometry.get_duplicate_atoms(big_crystal, cutoff=cut, delete=False)
+
+accepted_structures = 0
+runs = 0
 tot_trials = 0
 n_success = 0
-
+##
 for k in range(structures):
 
-    initial_structure = os.path.abspath("../2019_initial_structures_previous_pdb/"+str(random.randint(0, 545)) +".pdb")
-    print initial_structure
-    starting_structure = read(initial_structure)
     starting = copy.deepcopy(starting_structure)
-    trial_crystal = copy.deepcopy(starting)
+    trial_crystal, lat, trans, quat, starting_angles, n_failed = cr.generate_crystal(starting, parameter_set,
+                                                                                     high_angle, low_angle, high_trans,
+                                                                                     low_trans, 360, 0,
+                                                                                     sg, atoms, nr_molecules[choice],
+                                                                                     molecule, cut, close_atoms,
+                                                                                     vol_high,old_overlap=True)
+    tot_trials += n_failed + 1
+    n_success += 1
 
-    # Get the molecular volume
-    nr = starting.get_atomic_numbers()[:atoms]
-    rad = np.zeros(len(nr))
-    for l1 in range(0, len(rad)):
-        rad[l1] = 3.0 / 4.0 * np.pi * vdw_radii[nr[l1]] ** 3
-    Vmol = sum(rad) * nr_molecules[choice]
-
-    # Get the lattice parameters and sites from the reference structure
-    lat = starting.get_cell_lengths_and_angles()
-    sites = starting.get_chemical_symbols()
-
-    # Creation of a big unit cell to extract interatomic distances that are later used to confirm that no other short distances have been created, soon to become redundant
-    big_crystal = cr.create_crystal(starting, molecule, sg, atoms, sites, [400., 400., 400., 90., 90., 90.],
-                                    [100, 100, 100],
-                                    [1, 0, 0, 0], [0, 0, 0, 0, 0, 0], nr_molecules[choice])
-    close_atoms = ase.geometry.get_duplicate_atoms(big_crystal, cutoff=cut, delete=False)
-
-
+    write(directory + name + '/' + experiment + "_" + str(k) + '_init_structure.cif', trial_crystal)
+    print("Reasonable structure found after {} tries!".format(n_failed))
 
     all_costs = []
     all_chi_H = []
 
-    # 1H RMSE for the initial randomly generated crystal
+    #Calculates initial 1H, 13C and energy, if selected
+    chi_1H = 0
+    chi_13C = 0
+    energy = 0
     if H1:
-        chi_1H = calculate_1H(trial_crystal, krr, representation, trainsoaps, model_numbers, zeta, molecule)
-        print chi_1H
-    else:
-        chi_1H = 0
-    # 13C RMSE for the initial randomly generated crystal
+        chi_1H = calculate_1H(trial_crystal,krr,representation,trainsoaps,model_numbers,zeta,molecule)
     if C13:
-        chi_13C = calculate_C13(trial_crystal, krr_13C, representation_13C, trainsoaps_13C, model_numbers_13C, zeta_13C,
-                                molecule)
-    else:
-        chi_13C = 0
-    # Energy calculation for the initial randomly generated crystal
+        chi_13C = calculate_C13(trial_crystal, krr_13C, representation_13C, trainsoaps_13C, model_numbers_13C, zeta_13C, molecule)
     if use_energy:
         if cluster:
-            energy = dftb.dftbplus_energy('/dev/shm/', trial_crystal, dftb_path, dispersion="D3") * 2625.50 + energy_constant
+            energy = dftb.dftbplus_energy('/dev/shm/', trial_crystal, dftb_path,
+                                          dispersion="D3") * 2625.50 + energy_constant
         else:
-            energy = dftb.dftbplus_energy(directory + name + '/', trial_crystal, dftb_path, dispersion="D3") * 2625.50 + energy_constant
-        print energy
-    else:
-        energy = 0
+            energy = dftb.dftbplus_energy(directory + name + '/', trial_crystal, dftb_path,
+                                          dispersion="D3") * 2625.50 + energy_constant
 
-    # Saving the starting parameters
-    
-    cost_old = chi_1H * H_factor + chi_13C * C_factor + energy
+    chi_1H_last = chi_1H
+    energy_last = energy
+    print chi_1H, energy
+
+
+    #Saving the starting parameters
+    cost_old = chi_1H + chi_13C / 10.0 + factor*energy
     cost = cost_old
-
-    trial_conf = [0, 0, 0, 0, 0, 0]
-    trial_conf_old = [0, 0, 0, 0, 0, 0]
 
     #Follows which parameters are being selected and the success rate
     sel_parameters = [0, 0, 0, 0, 0]
     acc_parameters = [0, 0, 0, 0, 0]
 
-    #Counting how many steps are accepted and changing temperature depending on that
-    accepted_steps = 0
-    accepted_steps_in_a_row = 1
-    last_accepted = False
-    decrease_T = False
+    #Helper parameters for conformation change
+    trial_conf = [0,0,0,0,0,0]
+    trial_conf_old = [0,0,0,0,0,0]
 
+    last_accepted = False
     T = T_initial
     coefficient = coefficient_initial
 
-    trans = [0, 0, 0]
-    quat = [1, 0, 0, 0]
-    starting_angles = [0,0,0,0,0,0]
-
     for i in range(nloop):
 
-        if not decrease_T:
-            T = T*1.05
-
-        if decrease_T:
-            T = T*0.99
-            if last_accepted:
-                coefficient *= 2
-            else:
-                coefficient /= 2
-            if coefficient > 1.0:
-                coefficient = 1.0
-
         log_file = open(directory + name + '/' + experiment + '.log', "a")
-        log_file.write("Structure: " + str(k) + ", loop: " + str(i) + "\n")
+        log_file.write("Structure: "+str(k) + ", loop: " + str(i)+ "\n")
         log_file.close()
 
         print i
+        if i > 0:
+            T = T * 0.99
+            print T
+
+        if last_accepted:
+            coefficient *= 2
+        else:
+            coefficient /= 2
+        if coefficient > 1.0:
+            coefficient = 1.0
+
+        print "coefficient: ", coefficient
+        print lat[2]
+
+        # RT = RT_list[i]
         parameter = random.choice(parameter_set)
-        rotation_count = 0
 
         print parameter
         if parameter in ["a", "b", "c"]:
@@ -285,7 +305,7 @@ for k in range(structures):
 
         while True:
             try:
-                starting_copy = copy.deepcopy(starting_structure)
+                starting_copy=copy.deepcopy(starting_structure)
 
                 trial_lat = copy.deepcopy(lat)
                 trial_trans = copy.deepcopy(trans)
@@ -294,40 +314,28 @@ for k in range(structures):
 
                 if parameter == 'a':
                     trial_lat[0] += step_list[0] * (2 * mc.gauss_number() - 1) * coefficient
-                    if trial_lat[0] < 5:
-                        trial_lat[0] = 5
-                    if trial_lat[0] > 30:
-                        trial_lat[0] = 30
                 if parameter == 'b':
                     trial_lat[1] += step_list[1] * (2 * mc.gauss_number() - 1) * coefficient
-                    if trial_lat[1] < 5:
-                        trial_lat[1] = 5
-                    if trial_lat[1] > 30:
-                        trial_lat[1] = 30
                 if parameter == 'c':
-                   trial_lat[2] += step_list[2] * (2 * mc.gauss_number() - 1) * coefficient
-                   if trial_lat[2] < 5:
-                       trial_lat[2] = 5
-                   if trial_lat[2] > 30:
-                       trial_lat[2] = 30
+                    trial_lat[2] += step_list[2] * (2 * mc.gauss_number() - 1) * coefficient
                 if parameter == 'alpha':
                     trial_lat[3] += step_list[3] * (2 * mc.gauss_number() - 1) * coefficient
                     if trial_lat[3] < 45:
                         trial_lat[3] = 45
-                    elif trial_lat[3] > 135:
-                        trial_lat[3] = 135
+                    if trial_lat[3] > 135:
+                        trial_lat[3] = 134
                 if parameter == 'beta':
                     trial_lat[4] += step_list[4] * (2 * mc.gauss_number() - 1) * coefficient
                     if trial_lat[4] < 45:
                         trial_lat[4] = 45
-                    elif trial_lat[4] > 135:
-                        trial_lat[4] = 135
+                    if trial_lat[4] > 135:
+                        trial_lat[4] = 134
                 if parameter == 'gamma':
                     trial_lat[5] += step_list[5] * (2 * mc.gauss_number() - 1) * coefficient
                     if trial_lat[5] < 45:
                         trial_lat[5] = 45
-                    elif trial_lat[5] > 135:
-                        trial_lat[5] = 135
+                    if trial_lat[5] > 135:
+                        trial_lat[5] = 134
 
                 if parameter == 'trans':
                     trial_trans[0] += step_list[6] * (2 * mc.gauss_number() - 1) * coefficient
@@ -340,68 +348,63 @@ for k in range(structures):
                     trial_quat /= np.linalg.norm(trial_quat)
 
                 if parameter == 'conf':
-                    new_angles = mc.conf_angles(step_list[8]*coefficient, 'uniform')
-                    trial_conf[0] += new_angles[0]
-                    trial_conf[1] += new_angles[1]
-                    trial_conf[2] += new_angles[2]
-                    trial_conf[3] += new_angles[3]
-                    trial_conf[4] += new_angles[4]
-                    trial_conf[5] += new_angles[5]
+                    #print "test conf"
+                    new_angles = mc.conf_angles(step_list[8]* coefficient,'uniform')
+                    trial_conf[0] = new_angles[0]
+                    trial_conf[1] = new_angles[1]
+                    trial_conf[2] = new_angles[2]
+                    trial_conf[3] = new_angles[3]
+                    trial_conf[4] = new_angles[4]
+                    trial_conf[5] = new_angles[5]
+
 
                 vector1 = np.array(trial_conf)
                 vector2 = np.array(starting_angles)
                 trial_angles = vector1 + vector2
                 trial_structure = cr.create_crystal(starting_copy, molecule, sg, atoms, sites, trial_lat,
                                                     trial_trans, trial_quat, trial_angles, nr_molecules[choice])
+
+
                 break
             except Exception as e:
                 print(e)
                 pass
-        
+
         if write_intermediates:
             write(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif', trial_structure)
 
-        if cr.check_for_overlap(trial_structure, cut, close_atoms, Vmol, vol_high):
+        if cr.check_for_overlap(trial_structure, cut, close_atoms, Vmol, vol_high,old_overlap=True):
 
             if H1:
                 chi_1H = calculate_1H(trial_structure, krr, representation, trainsoaps, model_numbers, zeta, molecule)
-            else:
-                chi_1H = 0.
-
             if C13:
                 chi_13C = calculate_C13(trial_structure, krr_13C, representation_13C, trainsoaps_13C, model_numbers_13C,
                                         zeta_13C, molecule)
-            else:
-                chi_13C = 0.
-
             if use_energy:
                 if cluster:
-                    energy = dftb.dftbplus_energy('/dev/shm/', trial_structure, dftb_path, dispersion="D3") * 2625.50 + energy_constant
-                
+                    energy = dftb.dftbplus_energy('/dev/shm/', trial_structure, dftb_path,
+                                                  dispersion="D3") * 2625.50 + energy_constant
                 else:
-                    energy = dftb.dftbplus_energy(directory + name + '/', trial_structure, dftb_path, dispersion="D3") * 2625.50 + energy_constant
-            else:
-                energy = 0.
+                    energy = dftb.dftbplus_energy(directory + name + '/', trial_structure, dftb_path,
+                                                  dispersion="D3") * 2625.50 + energy_constant
 
             accept = False
-            
-            cost = chi_1H * H_factor + chi_13C * C_factor + energy
+            cost = chi_1H + chi_13C / 10.0 + factor*energy
 
             if cost < cost_old:
                 accept = True
-            elif random.random() <= math.exp((cost_old - cost)/(0.008314*T)):
+            elif random.random() <= math.exp((cost_old - cost) / (0.008314*T)):
                 accept = True
 
             if accept:
 
-                accepted_steps += 1
-                if last_accepted:
-                    accepted_steps_in_a_row += 1
-                last_accepted = True
-                if accepted_steps_in_a_row == 5:
-                    decrease_T = True
-                cost_old = cost
+                print chi_1H, energy
 
+                last_accepted = True
+
+                chi_1H_last = chi_1H
+                energy_last = energy
+                cost_old = cost
                 lat = copy.deepcopy(trial_lat)
                 trans = copy.deepcopy(trial_trans)
                 quat = copy.deepcopy(trial_quat)
@@ -420,43 +423,32 @@ for k in range(structures):
 
             else:
                 last_accepted = False
-                accepted_steps_in_a_row = 1
-                
+
         else:
             last_accepted = False
-            accepted_steps_in_a_row = 1
 
         if coefficient < 1e-4:
             break
 
-        print T, accepted_steps, accepted_steps_in_a_row, coefficient
         all_costs.append(cost)
         all_chi_H.append(chi_1H)
-        print lat
+
     # #Final parameters for the MC run
-    # accepted_chi_list = np.array(accepted_chi_list)
-    # accepted_energy_list = np.array(accepted_energy_list)
-    # np.save(directory + name + '/' + str(k) + '_accepted_chi_list.npy', accepted_chi_list)
-    # np.save(directory + name + '/' + str(k) + '_accepted_energy_list.npy', accepted_energy_list)
-    final_parameters = [chi_1H, energy]
+    final_parameters = [chi_1H_last,energy_last]
     final_parameters = np.array(final_parameters)
     np.save(directory + name + '/' + experiment + "_" + str(k) + '_final_parameters.npy', final_parameters)
-    np.save(directory + name + '/' + experiment + "_" + str(k) + '_costs.npy', all_costs)
-    np.save(directory + name + '/' + experiment + "_" + str(k) + '_1H_chis.npy', all_chi_H)
 
-    dat = np.array([sel_parameters, acc_parameters])
-    dat = dat.T
-    # np.savetxt('data_{}_{}.dat'.format(k, RT_start), dat, delimiter=',', fmt='%d')
 
-    starting_copy = copy.deepcopy(starting_structure)
-    vector1 = np.array(trial_conf_old)
-    vector2 = np.array(starting_angles)
-    final_angles = vector1 + vector2
-    final_structure = cr.create_crystal(starting_copy, molecule, sg, atoms, sites, lat, trans, quat, final_angles,
-                                        nr_molecules[choice])
-    write(directory + name + '/' + experiment + "_" + str(k) + '_structure.cif', final_structure)
-    if write_intermediates:
-        os.remove(directory + name + '/' + experiment + "_" + str(k) + '_trial_structure.cif')
+    if nloop > 0:
+        starting_copy=read(initial_structure)
+        vector1 = np.array(trial_conf_old)
+        vector2 = np.array(starting_angles)
+        final_angles = vector1+vector2
+        final_structure = cr.create_crystal(starting_copy, molecule, sg, atoms, sites, lat, trans, quat, final_angles,
+                                            nr_molecules[choice])
+        write(directory + name + '/' + experiment + "_" + str(k) + '_structure.cif', final_structure)
+    print ""
+
 
     if simplex:
 
@@ -550,18 +542,22 @@ for k in range(structures):
             constants.append(final_angles[5])
             constants_names.append("conf")
 
-        all_param_names = ['a', 'b', 'c', 'alpha', 'beta', 'gamma', 'trans_x', 'trans_y', 'trans_z', 'rot_x', 'rot_y',
-                           'rot_z', 'conf']
+        all_param_names = ['a', 'b', 'c', 'alpha', 'beta', 'gamma', 'trans_x', 'trans_y', 'trans_z', 'quat_0', 'quat_1',
+                           'quat_2','quat_3','conf']
+
+
 
 
         def optimisation_function(guess, constants, guess_names, constants_names, all_param_names, starting, sg, atoms,
-                                  sites, H1, use_energy, H_factor, krr, representation, trainsoaps, model_numbers,
+                                  sites, H1, use_energy, factor, krr, representation, trainsoaps, model_numbers,
                                   zeta, molecule, directory, name, experiment, k, energy_constant):
 
             # Make a list of the parameters
             all_params = []
             ind_guess = 0
             ind_const = 0
+
+
             for param in all_param_names:
                 if param in guess_names:
                     if param == "conf":
@@ -580,7 +576,6 @@ for k in range(structures):
                         all_params.append(constants[ind_const])
                         ind_const += 1
 
-            # print all_params
 
             # Load a structure and apply the parameters
             starting_copy = copy.deepcopy(starting)
@@ -597,6 +592,7 @@ for k in range(structures):
                            all_params[18]]
             trial_structure = cr.create_crystal(starting_copy, molecule, sg, atoms, sites, lat, trans, quat,
                                                 conf_angles, nr_molecules[choice])
+
             write(directory + name + '/' + experiment + "_" + str(k) + '_opt_structure.cif', trial_structure)
 
             # Compute shifts and H_rmse
@@ -622,23 +618,20 @@ for k in range(structures):
             final_parameters = np.array(final_parameters)
             np.save(directory + name + '/' + experiment + "_" + str(k) + '_final_opt_parameters.npy', final_parameters)
 
-            print cost
+            print chi_1H + factor * energy
 
-            return chi_1H + H_factor * energy
+            return chi_1H + factor * energy
 
 
         res = op.minimize(optimisation_function, guess, args=(
-        constants, guess_names, constants_names, all_param_names, starting, sg, atoms, sites, H1, use_energy, H_factor,
+        constants, guess_names, constants_names, all_param_names, starting, sg, atoms, sites, H1, use_energy, factor,
         krr, representation, trainsoaps, model_numbers,
         zeta, molecule, directory, name, experiment, k, energy_constant), method='Nelder-Mead', tol=1e-2,
                           options={'fatol': 1e-2})
 
         print res
 
-        ##
 
-print("Structure generation lead to {:.2f}% of successful initial structures ({}/{})".format(
-    float(n_success) / float(tot_trials) * 100., n_success, tot_trials))
 
 
 
