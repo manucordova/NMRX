@@ -180,11 +180,14 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
                 #     lat[5] = 90.0
 
                 if 'rot' in parameter_set:
-                    quat = np.zeros(4)
-                    quat[0] = 0.5-random.random()
-                    quat[1] = 0.5-random.random()
-                    quat[2] = 0.5-random.random()
-                    quat[3] = 0.5-random.random()
+                    L = 2.
+                    while L > 1:
+                        quat = np.zeros(4)
+                        quat[0] = 0.5-random.random()
+                        quat[1] = 0.5-random.random()
+                        quat[2] = 0.5-random.random()
+                        quat[3] = 0.5-random.random()
+                        L = np.linalg.norm(quat)
                     quat /= np.linalg.norm(quat)
                     #rx = (rotate_high - rotate_low) * random.random() + rotate_low
                     #ry = (rotate_high - rotate_low) * random.random() + rotate_low
