@@ -194,23 +194,31 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
                     quat = [1,0,0,0]
                     #rotation = [0, 0, 0]
 
-                cell_l = ["a", "b", "c"]
-                low_lens = get_projections(starting, lat[3], lat[4], lat[5], atoms, quat)
-                tmp_l = [0., 0.]
-                for i, x in enumerate(np.random.permutation(cell_l)):
-                    ind_l = cell_l.index(x)
-                    if x in parameter_set:
-                        if i < 2:
-                            #lat[ind_l] = (high_len-low_len)*random.random()+low_len
-                            lat[ind_l] = low_lens[ind_l]*((n_mol-1)*random.random()+1)
-                            tmp_l[i] = lat[ind_l]
-                        else:
-                            low_c = get_third_length_low(tmp_l[0], tmp_l[1], lat[3], lat[4], lat[5], Vmol)
-                            #sqroot = 1+(2*np.cos(np.deg2rad(lat[3]))*np.cos(np.deg2rad(lat[4]))*np.cos(np.deg2rad(lat[5])))
-                            #sqroot += -np.cos(np.deg2rad(lat[3]))**2-np.cos(np.deg2rad(lat[4]))**2-np.cos(np.deg2rad(lat[5]))**2
-                            #sqroot = np.sqrt(sqroot)
-                            #low_c = Vmol / (tmp_vol*sqroot)
-                            lat[ind_l] = (vol_high*low_c-low_c)*random.random()+low_c
+                if smart_cell:
+                    cell_l = ["a", "b", "c"]
+                    low_lens = get_projections(starting, lat[3], lat[4], lat[5], atoms, quat)
+                    tmp_l = [0., 0.]
+                    for i, x in enumerate(np.random.permutation(cell_l)):
+                        ind_l = cell_l.index(x)
+                        if x in parameter_set:
+                            if i < 2:
+                                #lat[ind_l] = (high_len-low_len)*random.random()+low_len
+                                lat[ind_l] = low_lens[ind_l]*((n_mol-1)*random.random()+1)
+                                tmp_l[i] = lat[ind_l]
+                            else:
+                                low_c = get_third_length_low(tmp_l[0], tmp_l[1], lat[3], lat[4], lat[5], Vmol)
+                                #sqroot = 1+(2*np.cos(np.deg2rad(lat[3]))*np.cos(np.deg2rad(lat[4]))*np.cos(np.deg2rad(lat[5])))
+                                #sqroot += -np.cos(np.deg2rad(lat[3]))**2-np.cos(np.deg2rad(lat[4]))**2-np.cos(np.deg2rad(lat[5]))**2
+                                #sqroot = np.sqrt(sqroot)
+                                #low_c = Vmol / (tmp_vol*sqroot)
+                                lat[ind_l] = (vol_high*low_c-low_c)*random.random()+low_c
+                else:
+                    if 'a' in parameter_set:
+                        lat[0] = (7.5*n_mol - 2.0*n_mol) * random.random() + 2.0*n_mol
+                    if 'b' in parameter_set:
+                        lat[1] = (7.5*n_mol - 2.0*n_mol) * random.random() + 2.0*n_mol
+                    if 'c' in parameter_set:
+                        lat[2] = (7.5*n_mol - 2.0*n_mol) * random.random() + 2.0*n_mol
                             
 #                if 'a'in parameter_set:
 #                    lat[0] = (high_len-low_len)*random.random()+low_len

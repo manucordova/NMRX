@@ -30,44 +30,16 @@ def get_close_atoms(struct, cutoff=0.1):
         if j > i:
             close_atoms.append([i, j])
     return close_atoms
+#
 
-def rotate_molecule(structure, center, quat, atoms):
-    
-    # Quaternion rotation
-    R = np.zeros((3,3))
-    R[0,0] = quat[0]**2 + quat[1]**2 - quat[2]**2 - quat[3]**2
-    R[0,1] = 2*(quat[1]*quat[2] - quat[0]*quat[3])
-    R[0,2] = 2*(quat[1]*quat[3] + quat[0]*quat[2])
-    R[1,0] = 2*(quat[1]*quat[2] + quat[0]*quat[3])
-    R[1,1] = quat[0]**2 - quat[1]**2 + quat[2]**2 - quat[3]**2
-    R[1,2] = 2*(quat[2]*quat[3] - quat[0]*quat[1])
-    R[2,0] = 2*(quat[1]*quat[3] - quat[0]*quat[2])
-    R[2,1] = 2*(quat[2]*quat[3] + quat[0]*quat[1])
-    R[2,2] = quat[0]**2 - quat[1]**2 - quat[2]**2 + quat[3]**2
-    
-    xyz = structure.get_positions()
-    
-    for i in range(atoms):
-        xyz[i] -= center
-        xyz[i] = R.dot(xyz[i])
-        xyz[i] += center
-    
-    structure.set_positions(xyz)
-    
-    return structure
-
-def create_crystal(structure,molecule,sg,atoms,sites,lat,trans,quat,conf_angles, n_mol):
-#def create_crystal(structure,molecule,sg,atoms,sites,lat,trans,rotation,conf_angles, n_mol):
+def create_crystal(structure,molecule,sg,atoms,sites,lat,trans,rotation,conf_angles,n_mol):
 
     structure.translate(trans)
 
     mass = structure[0:atoms].get_center_of_mass()
-    
-    structure = rotate_molecule(structure, mass, quat, atoms)
-    
-#    structure.rotate(rotation[0], v='x', center=mass)
-#    structure.rotate(rotation[1], v='y', center=mass)
-#    structure.rotate(rotation[2], v='z', center=mass)
+    structure.rotate(rotation[0], v='x', center=mass)
+    structure.rotate(rotation[1], v='y', center=mass)
+    structure.rotate(rotation[2], v='z', center=mass)
 
     structure = mc.change_conformation(structure,conf_angles[0],conf_angles[1],conf_angles[2],conf_angles[3],conf_angles[4],conf_angles[5],molecule)
 
@@ -77,8 +49,9 @@ def create_crystal(structure,molecule,sg,atoms,sites,lat,trans,quat,conf_angles,
     trial_crystal = crystal(symbols=sites, basis=scaled[:atoms], spacegroup=sg, cell=lat, symprec=0.001, pbc=True)
     trial_crystal = mc.rewrite_coordinate(trial_crystal, n_mol, molecule=molecule)
 
-
     return trial_crystal
+
+
 
 def get_third_length_low(a, b, alpha, beta, gamma, Vmol):
     sqroot = 1+(2*np.cos(np.deg2rad(alpha))*np.cos(np.deg2rad(beta))*np.cos(np.deg2rad(gamma)))
@@ -86,7 +59,7 @@ def get_third_length_low(a, b, alpha, beta, gamma, Vmol):
     sqroot = np.sqrt(sqroot)
     return Vmol / (a*b*sqroot)
 
-def get_projections(struct, alpha, beta, gamma, atoms, quat):
+def get_projections(struct, alpha, beta, gamma, atoms, rotation):
     unit_a = np.array([1,0,0])
     unit_b = np.zeros(3)
     unit_b[0] = np.cos(np.deg2rad(gamma))
@@ -180,37 +153,45 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
                 #     lat[5] = 90.0
 
                 if 'rot' in parameter_set:
-                    quat = np.zeros(4)
-                    quat[0] = 0.5-random.random()
-                    quat[1] = 0.5-random.random()
-                    quat[2] = 0.5-random.random()
-                    quat[3] = 0.5-random.random()
-                    quat /= np.linalg.norm(quat)
-                    #rx = (rotate_high - rotate_low) * random.random() + rotate_low
-                    #ry = (rotate_high - rotate_low) * random.random() + rotate_low
-                    #rz = (rotate_high - rotate_low) * random.random() + rotate_low
-                    #rotation = [rx, ry, rz]
+                    # quat = np.zeros(4)
+                    # quat[0] = 0.5-random.random()
+                    # quat[1] = 0.5-random.random()
+                    # quat[2] = 0.5-random.random()
+                    # quat[3] = 0.5-random.random()
+                    # quat /= np.linalg.norm(quat)
+                    rx = (rotate_high - rotate_low) * random.random() + rotate_low
+                    ry = (rotate_high - rotate_low) * random.random() + rotate_low
+                    rz = (rotate_high - rotate_low) * random.random() + rotate_low
+                    rotation = [rx, ry, rz]
                 else:
-                    quat = [1,0,0,0]
-                    #rotation = [0, 0, 0]
+                    # quat = [1,0,0,0]
+                    rotation = [0, 0, 0]
 
-                cell_l = ["a", "b", "c"]
-                low_lens = get_projections(starting, lat[3], lat[4], lat[5], atoms, quat)
-                tmp_l = [0., 0.]
-                for i, x in enumerate(np.random.permutation(cell_l)):
-                    ind_l = cell_l.index(x)
-                    if x in parameter_set:
-                        if i < 2:
-                            #lat[ind_l] = (high_len-low_len)*random.random()+low_len
-                            lat[ind_l] = low_lens[ind_l]*((n_mol-1)*random.random()+1)
-                            tmp_l[i] = lat[ind_l]
-                        else:
-                            low_c = get_third_length_low(tmp_l[0], tmp_l[1], lat[3], lat[4], lat[5], Vmol)
-                            #sqroot = 1+(2*np.cos(np.deg2rad(lat[3]))*np.cos(np.deg2rad(lat[4]))*np.cos(np.deg2rad(lat[5])))
-                            #sqroot += -np.cos(np.deg2rad(lat[3]))**2-np.cos(np.deg2rad(lat[4]))**2-np.cos(np.deg2rad(lat[5]))**2
-                            #sqroot = np.sqrt(sqroot)
-                            #low_c = Vmol / (tmp_vol*sqroot)
-                            lat[ind_l] = (vol_high*low_c-low_c)*random.random()+low_c
+                if smart_cell:
+                    cell_l = ["a", "b", "c"]
+                    low_lens = get_projections(starting, lat[3], lat[4], lat[5], atoms, rotation)
+                    tmp_l = [0., 0.]
+                    for i, x in enumerate(np.random.permutation(cell_l)):
+                        ind_l = cell_l.index(x)
+                        if x in parameter_set:
+                            if i < 2:
+                                #lat[ind_l] = (high_len-low_len)*random.random()+low_len
+                                lat[ind_l] = low_lens[ind_l]*((n_mol-1)*random.random()+1)
+                                tmp_l[i] = lat[ind_l]
+                            else:
+                                low_c = get_third_length_low(tmp_l[0], tmp_l[1], lat[3], lat[4], lat[5], Vmol)
+                                #sqroot = 1+(2*np.cos(np.deg2rad(lat[3]))*np.cos(np.deg2rad(lat[4]))*np.cos(np.deg2rad(lat[5])))
+                                #sqroot += -np.cos(np.deg2rad(lat[3]))**2-np.cos(np.deg2rad(lat[4]))**2-np.cos(np.deg2rad(lat[5]))**2
+                                #sqroot = np.sqrt(sqroot)
+                                #low_c = Vmol / (tmp_vol*sqroot)
+                                lat[ind_l] = (vol_high*low_c-low_c)*random.random()+low_c
+                else:
+                    if 'a' in parameter_set:
+                        lat[0] = (7.5*n_mol - 2.0*n_mol) * random.random() + 2.0*n_mol
+                    if 'b' in parameter_set:
+                        lat[1] = (7.5*n_mol - 2.0*n_mol) * random.random() + 2.0*n_mol
+                    if 'c' in parameter_set:
+                        lat[2] = (7.5*n_mol - 2.0*n_mol) * random.random() + 2.0*n_mol
                             
 #                if 'a'in parameter_set:
 #                    lat[0] = (high_len-low_len)*random.random()+low_len
@@ -238,7 +219,7 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
 
 
                 #Overwrite the starting structure and create a trial structure for testing
-                trial_crystal = create_crystal(starting_copy,molecule,sg,atoms,sites,lat,trans,quat,starting_angles, n_mol)
+                trial_crystal = create_crystal(starting_copy,molecule,sg,atoms,sites,lat,trans,rotation,starting_angles, n_mol)
                 break
             except Exception as e:
                 print(e)
@@ -252,4 +233,4 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
             print "Cell relative volume: " + str((trial_crystal.get_volume())/Vmol)
             break
 
-    return trial_crystal, lat, trans, quat, starting_angles, n_failed
+    return trial_crystal, lat, trans, rotation, starting_angles, n_failed

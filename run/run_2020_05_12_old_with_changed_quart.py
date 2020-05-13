@@ -28,7 +28,7 @@ sys.path.insert(0, "../src")
 import mc_functions_v2 as mc
 import ml_functions as ml
 import dftb_v2 as dftb
-import generate_crystals_v2 as cr
+import generate_crystals as cr
 
 
 # np_load_old = np.load
@@ -59,7 +59,7 @@ cluster = False
 
 # Primary parameters to change
 molecule = "cocaine"
-nloop = 1
+nloop = 4000
 structures = 999
 
 simplex = True
@@ -74,12 +74,12 @@ comment = '_test'
 #parameter_set = ['']
 #parameter_set = ['rot']
 #parameter_set = ['c']
+#parameter_set = ['a','b','c','beta']
 #parameter_set = ['a','b','c']
-#parameter_set = ['a','b','c','alpha','beta','gamma','trans','rot','conf']
 #parameter_set = ['a','b','c','alpha','beta','gamma']
 #parameter_set = ['a','b','c','beta','trans','rot','conf']
 #parameter_set = ['trans','rot']
-parameter_set = ['a','b','c','beta','trans','rot']
+parameter_set = ['a','b','c','beta','trans','rot','conf']
 #parameter_set = ['conf']
 directory = os.path.abspath('../data/test/') + "/"
 vol_high = 3.0
@@ -125,19 +125,10 @@ if molecule == "ritonavir":  # space group 19
     atoms = 98
 
 
-def nonlinspace(start,stop,num,exp):
-    curve = []
-    linear = np.linspace(0, 1.0, num)
-    for elem in linear:
-        curve.append((1-(elem)**exp)*(start-stop)+stop)
-    return curve
-
 if use_RT:
-    RT_list = nonlinspace(RT_start, RT_end, nloop, 5)
+    RT_list = np.linspace(RT_start,RT_end,nloop)
 else:
     RT_list = np.linspace(0.001, 0.001, nloop)
-
-alpha = np.linspace(1,1,nloop) #remember to change if want to play with variable parameters
 
 try:
     os.mkdir(directory)
@@ -212,7 +203,7 @@ for k in range(structures):
                                                                                      low_trans, 360, 0,
                                                                                      sg, atoms, nr_molecules[choice],
                                                                                      molecule, cut, close_atoms,
-                                                                                     vol_high,old_overlap=True,smart_cell = False)
+                                                                                     vol_high)
     tot_trials += n_failed + 1
     n_success += 1
 
@@ -257,8 +248,6 @@ for k in range(structures):
 
     for i in range(nloop):
 
-        #print  "alpha", str(alpha[i])
-
         log_file = open(directory + name + '/' + experiment + '.log', "a")
         log_file.write("Structure: "+str(k) + ", loop: " + str(i)+ "\n")
         log_file.close()
@@ -292,31 +281,31 @@ for k in range(structures):
                     trial_conf = copy.deepcopy(trial_conf_old)
 
                     if parameter == 'a':
-                        trial_lat[0] += step_list[0] * (2 * mc.gauss_number() - 1) * alpha[i]
+                        trial_lat[0] += step_list[0] * (2 * mc.gauss_number() - 1)
                     if parameter == 'b':
-                        trial_lat[1] += step_list[1] * (2 * mc.gauss_number() - 1) * alpha[i]
+                        trial_lat[1] += step_list[1] * (2 * mc.gauss_number() - 1)
                     if parameter == 'c':
-                        trial_lat[2] += step_list[2] * (2 * mc.gauss_number() - 1) * alpha[i]
+                        trial_lat[2] += step_list[2] * (2 * mc.gauss_number() - 1)
                     if parameter == 'alpha':
-                        trial_lat[3] += step_list[3] * (2 * mc.gauss_number() - 1) * alpha[i]
+                        trial_lat[3] += step_list[3] * (2 * mc.gauss_number() - 1)
                     if parameter == 'beta':
-                        trial_lat[4] += step_list[4] * (2 * mc.gauss_number() - 1) * alpha[i]
+                        trial_lat[4] += step_list[4] * (2 * mc.gauss_number() - 1)
                     if parameter == 'gamma':
-                        trial_lat[5] += step_list[5] * (2 * mc.gauss_number() - 1) * alpha[i]
+                        trial_lat[5] += step_list[5] * (2 * mc.gauss_number() - 1)
 
                     if parameter == 'trans':
-                        trial_trans[0] += step_list[6] * (2 * mc.gauss_number() - 1) * alpha[i]
-                        trial_trans[1] += step_list[6] * (2 * mc.gauss_number() - 1) * alpha[i]
-                        trial_trans[2] += step_list[6] * (2 * mc.gauss_number() - 1) * alpha[i]
+                        trial_trans[0] += step_list[6] * (2 * mc.gauss_number() - 1)
+                        trial_trans[1] += step_list[6] * (2 * mc.gauss_number() - 1)
+                        trial_trans[2] += step_list[6] * (2 * mc.gauss_number() - 1)
 
                     if parameter == 'rot':
                         for i in range(4):
-                            trial_quat[i] += step_list[7] * (random.random() - 0.5) * alpha[i]
+                            trial_quat[i] += step_list[7] * (random.random() - 0.5)
                         trial_quat /= np.linalg.norm(trial_quat)
 
                     if parameter == 'conf':
                         #print "test conf"
-                        new_angles = mc.conf_angles(step_list[8] * alpha[i],'uniform')
+                        new_angles = mc.conf_angles(step_list[7],'uniform')
                         trial_conf[0] = new_angles[0]
                         trial_conf[1] = new_angles[1]
                         trial_conf[2] = new_angles[2]
@@ -337,7 +326,7 @@ for k in range(structures):
                     print(e)
                     pass
 
-            if cr.check_for_overlap(trial_structure, cut, close_atoms, Vmol, vol_high,old_overlap=True):
+            if cr.check_for_overlap(trial_structure, cut, close_atoms, Vmol, vol_high):
                 break
 
         if write_intermediates:
@@ -407,186 +396,178 @@ for k in range(structures):
     print ""
 
 
-    if simplex:
+    # if simplex:
+    #
+    #     guess = []
+    #     constants = []
+    #     guess_names = []
+    #     constants_names = []
+    #
+    #     if 'a' in parameter_set:
+    #         guess.append(lat[0])
+    #         guess_names.append("a")
+    #     else:
+    #         constants.append(lat[0])
+    #         constants_names.append("a")
+    #     if 'b' in parameter_set:
+    #         guess.append(lat[1])
+    #         guess_names.append("b")
+    #     else:
+    #         constants.append(lat[1])
+    #         constants_names.append("b")
+    #     if 'c' in parameter_set:
+    #         guess.append(lat[2])
+    #         guess_names.append("c")
+    #     else:
+    #         constants.append(lat[2])
+    #         constants_names.append("c")
+    #     if 'alpha' in parameter_set:
+    #         guess.append(lat[3])
+    #         guess_names.append("alpha")
+    #     else:
+    #         constants.append(lat[3])
+    #         constants_names.append("alpha")
+    #     if 'beta' in parameter_set:
+    #         guess.append(lat[4])
+    #         guess_names.append("beta")
+    #     else:
+    #         constants.append(lat[4])
+    #         constants_names.append("beta")
+    #     if 'gamma' in parameter_set:
+    #         guess.append(lat[5])
+    #         guess_names.append("gamma")
+    #     else:
+    #         constants.append(lat[5])
+    #         constants_names.append("gamma")
+    #     if 'trans' in parameter_set:
+    #         guess.append(trans[0])
+    #         guess.append(trans[1])
+    #         guess.append(trans[2])
+    #         guess_names.append("trans_x")
+    #         guess_names.append("trans_y")
+    #         guess_names.append("trans_z")
+    #     else:
+    #         constants.append(trans[0])
+    #         constants.append(trans[1])
+    #         constants.append(trans[2])
+    #         constants_names.append("trans_x")
+    #         constants_names.append("trans_y")
+    #         constants_names.append("trans_z")
+    #     if 'rot' in parameter_set:
+    #         guess.append(rotation[0])
+    #         guess.append(rotation[1])
+    #         guess.append(rotation[2])
+    #         guess_names.append("rot_x")
+    #         guess_names.append("rot_y")
+    #         guess_names.append("rot_z")
+    #     else:
+    #         constants.append(rotation[0])
+    #         constants.append(rotation[1])
+    #         constants.append(rotation[2])
+    #         constants_names.append("rot_x")
+    #         constants_names.append("rot_y")
+    #         constants_names.append("rot_z")
+    #     if 'conf' in parameter_set:
+    #         guess.append(final_angles[0])
+    #         guess.append(final_angles[1])
+    #         guess.append(final_angles[2])
+    #         guess.append(final_angles[3])
+    #         guess.append(final_angles[4])
+    #         guess.append(final_angles[5])
+    #         guess_names.append("conf")
+    #     else:
+    #         constants.append(final_angles[0])
+    #         constants.append(final_angles[1])
+    #         constants.append(final_angles[2])
+    #         constants.append(final_angles[3])
+    #         constants.append(final_angles[4])
+    #         constants.append(final_angles[5])
+    #         constants_names.append("conf")
+    #
+    #
+    #
+    #     all_param_names = ['a', 'b', 'c', 'alpha', 'beta', 'gamma', 'trans_x', 'trans_y', 'trans_z', 'rot_x', 'rot_y',
+    #                        'rot_z', 'conf']
+    #
+    #
+    #     def optimisation_function(guess, constants, guess_names, constants_names, all_param_names, initial_structure, sg, atoms, sites, H1, use_energy, factor, krr, representation, trainsoaps, model_numbers,
+    #                               zeta,molecule,directory,name,experiment,k,energy_constant):
+    #
+    #
+    #         #Make a list of the parameters
+    #         all_params = []
+    #         ind_guess = 0
+    #         ind_const = 0
+    #         for param in all_param_names:
+    #             if param in guess_names:
+    #                 if param == "conf":
+    #                     if param in guess_names[:-1]:
+    #                         raise ValueError("conf parameter should be in last position.")
+    #                     all_params.extend(guess[ind_guess:])
+    #                 else:
+    #                     all_params.append(guess[ind_guess])
+    #                     ind_guess += 1
+    #             elif param in constants_names:
+    #                 if param == "conf":
+    #                     if param in constants_names[:-1]:
+    #                         raise ValueError("conf parameter should be in last position.")
+    #                     all_params.extend(constants[ind_const:])
+    #                 else:
+    #                     all_params.append(constants[ind_const])
+    #                     ind_const += 1
+    #
+    #         #print all_params
+    #
+    #         #Load a structure and apply the parameters
+    #         starting_copy = read(initial_structure)
+    #         lat = starting_copy.get_cell_lengths_and_angles()
+    #         lat[0] = all_params[0]
+    #         lat[1] = all_params[1]
+    #         lat[2] = all_params[2]
+    #         lat[3] = all_params[3]
+    #         lat[4] = all_params[4]
+    #         lat[5] = all_params[5]
+    #         trans = [all_params[6], all_params[7], all_params[8]]
+    #         rotation = [all_params[9], all_params[10], all_params[11]]
+    #         conf_angles = [all_params[12], all_params[13], all_params[14], all_params[15], all_params[16],all_params[17]]
+    #         trial_structure = create_crystal(starting_copy, molecule, sg, atoms, sites, lat, trans, rotation, conf_angles)
+    #         write(directory + name + '/' + experiment + "_" + str(k) + '_opt_structure.cif', trial_structure)
+    #
+    #         # Compute shifts and H_rmse
+    #         if H1:
+    #             chi = calculate_1H(trial_structure, krr, representation, trainsoaps, model_numbers, zeta, molecule)
+    #         else:
+    #             chi = 0
+    #
+    #
+    #         if use_energy:
+    #             energy = dftb.dftbplus_energy(directory + name + '/', trial_structure, dftb_path, dispersion="D3") * 2625.50 + energy_constant
+    #
+    #         else:
+    #             energy = 0
+    #
+    #         # chi_save = np.array(chi)
+    #         # energy_save = np.array(energy)
+    #         # np.save(directory + name + '/' + experiment + "_" + str(k) + '_opt_chi.npy', chi_save)
+    #         # np.save(directory + name + '/' + experiment + "_" + str(k) + '_opt_energy.npy', energy_save)
+    #
+    #         final_parameters = [chi, energy]
+    #         final_parameters = np.array(final_parameters)
+    #         np.save(directory + name + '/' + experiment + "_" + str(k) + '_final_opt_parameters.npy', final_parameters)
+    #
+    #         print energy, chi
+    #
+    #         return chi + factor*energy
+    #
+    #
+    #
+    #     res = op.minimize(optimisation_function, guess, args=(constants, guess_names, constants_names, all_param_names, initial_structure, sg, atoms, sites,H1, use_energy, factor, krr, representation, trainsoaps, model_numbers,
+    #                               zeta,molecule,directory,name,experiment,k,energy_constant),method='Nelder-Mead',tol=1e-2,options={'fatol': 1e-2})
+    #
+    #     print res
 
-        guess = []
-        constants = []
-        guess_names = []
-        constants_names = []
+        ##
 
-        if 'a' in parameter_set:
-            guess.append(lat[0])
-            guess_names.append("a")
-        else:
-            constants.append(lat[0])
-            constants_names.append("a")
-        if 'b' in parameter_set:
-            guess.append(lat[1])
-            guess_names.append("b")
-        else:
-            constants.append(lat[1])
-            constants_names.append("b")
-        if 'c' in parameter_set:
-            guess.append(lat[2])
-            guess_names.append("c")
-        else:
-            constants.append(lat[2])
-            constants_names.append("c")
-        if 'alpha' in parameter_set:
-            guess.append(lat[3])
-            guess_names.append("alpha")
-        else:
-            constants.append(lat[3])
-            constants_names.append("alpha")
-        if 'beta' in parameter_set:
-            guess.append(lat[4])
-            guess_names.append("beta")
-        else:
-            constants.append(lat[4])
-            constants_names.append("beta")
-        if 'gamma' in parameter_set:
-            guess.append(lat[5])
-            guess_names.append("gamma")
-        else:
-            constants.append(lat[5])
-            constants_names.append("gamma")
-        if 'trans' in parameter_set:
-            guess.append(trans[0])
-            guess.append(trans[1])
-            guess.append(trans[2])
-            guess_names.append("trans_x")
-            guess_names.append("trans_y")
-            guess_names.append("trans_z")
-        else:
-            constants.append(trans[0])
-            constants.append(trans[1])
-            constants.append(trans[2])
-            constants_names.append("trans_x")
-            constants_names.append("trans_y")
-            constants_names.append("trans_z")
-        if 'rot' in parameter_set:
-            guess.append(quat[0])
-            guess.append(quat[1])
-            guess.append(quat[2])
-            guess.append(quat[3])
-            guess_names.append("quat_0")
-            guess_names.append("quat_1")
-            guess_names.append("quat_2")
-            guess_names.append("quat_3")
-        else:
-            constants.append(quat[0])
-            constants.append(quat[1])
-            constants.append(quat[2])
-            constants.append(quat[3])
-            constants_names.append("quat_0")
-            constants_names.append("quat_1")
-            constants_names.append("quat_2")
-            constants_names.append("quat_3")
-        if 'conf' in parameter_set:
-            guess.append(final_angles[0])
-            guess.append(final_angles[1])
-            guess.append(final_angles[2])
-            guess.append(final_angles[3])
-            guess.append(final_angles[4])
-            guess.append(final_angles[5])
-            guess_names.append("conf")
-        else:
-            constants.append(final_angles[0])
-            constants.append(final_angles[1])
-            constants.append(final_angles[2])
-            constants.append(final_angles[3])
-            constants.append(final_angles[4])
-            constants.append(final_angles[5])
-            constants_names.append("conf")
-
-        all_param_names = ['a', 'b', 'c', 'alpha', 'beta', 'gamma', 'trans_x', 'trans_y', 'trans_z', 'quat_0', 'quat_1',
-                           'quat_2','quat_3','conf']
-
-
-
-
-        def optimisation_function(guess, constants, guess_names, constants_names, all_param_names, starting, sg, atoms,
-                                  sites, H1, use_energy, factor, krr, representation, trainsoaps, model_numbers,
-                                  zeta, molecule, directory, name, experiment, k, energy_constant):
-
-            # Make a list of the parameters
-            all_params = []
-            ind_guess = 0
-            ind_const = 0
-
-
-            for param in all_param_names:
-                if param in guess_names:
-                    if param == "conf":
-                        if param in guess_names[:-1]:
-                            raise ValueError("conf parameter should be in last position.")
-                        all_params.extend(guess[ind_guess:])
-                    else:
-                        all_params.append(guess[ind_guess])
-                        ind_guess += 1
-                elif param in constants_names:
-                    if param == "conf":
-                        if param in constants_names[:-1]:
-                            raise ValueError("conf parameter should be in last position.")
-                        all_params.extend(constants[ind_const:])
-                    else:
-                        all_params.append(constants[ind_const])
-                        ind_const += 1
-
-
-            # Load a structure and apply the parameters
-            starting_copy = copy.deepcopy(starting)
-            lat = starting_copy.get_cell_lengths_and_angles()
-            lat[0] = all_params[0]
-            lat[1] = all_params[1]
-            lat[2] = all_params[2]
-            lat[3] = all_params[3]
-            lat[4] = all_params[4]
-            lat[5] = all_params[5]
-            trans = [all_params[6], all_params[7], all_params[8]]
-            quat = [all_params[9], all_params[10], all_params[11], all_params[12]]
-            conf_angles = [all_params[13], all_params[14], all_params[15], all_params[16], all_params[17],
-                           all_params[18]]
-            trial_structure = cr.create_crystal(starting_copy, molecule, sg, atoms, sites, lat, trans, quat,
-                                                conf_angles, nr_molecules[choice])
-
-            write(directory + name + '/' + experiment + "_" + str(k) + '_opt_structure.cif', trial_structure)
-
-            # Compute shifts and H_rmse
-            if H1:
-                chi_1H = calculate_1H(trial_structure, krr, representation, trainsoaps, model_numbers, zeta, molecule)
-            else:
-                chi_1H = 0
-
-            if use_energy:
-                if cluster:
-                    energy = dftb.dftbplus_energy('/dev/shm/', trial_structure, dftb_path, dispersion="D3") * 2625.50 + energy_constant
-                else:
-                    energy = dftb.dftbplus_energy(directory + name + '/', trial_structure, dftb_path, dispersion="D3") * 2625.50 + energy_constant
-            else:
-                energy = 0
-
-            # chi_save = np.array(chi)
-            # energy_save = np.array(energy)
-            # np.save(directory + name + '/' + experiment + "_" + str(k) + '_opt_chi.npy', chi_save)
-            # np.save(directory + name + '/' + experiment + "_" + str(k) + '_opt_energy.npy', energy_save)
-
-            final_parameters = [chi_1H, energy]
-            final_parameters = np.array(final_parameters)
-            np.save(directory + name + '/' + experiment + "_" + str(k) + '_final_opt_parameters.npy', final_parameters)
-
-            print chi_1H + factor * energy
-
-            return chi_1H + factor * energy
-
-
-        res = op.minimize(optimisation_function, guess, args=(
-        constants, guess_names, constants_names, all_param_names, starting, sg, atoms, sites, H1, use_energy, factor,
-        krr, representation, trainsoaps, model_numbers,
-        zeta, molecule, directory, name, experiment, k, energy_constant), method='Nelder-Mead', tol=1e-2,
-                          options={'fatol': 1e-2})
-
-        print res
 
 
 
