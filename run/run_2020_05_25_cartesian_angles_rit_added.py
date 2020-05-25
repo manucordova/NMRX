@@ -58,7 +58,7 @@ dftb_path = which("dftb+")
 cluster = False
 
 # Primary parameters to change
-molecule = "ritonavir"
+molecule = "cocaine"
 nloop = 2
 structures = 2
 
@@ -79,8 +79,8 @@ comment = '_test'
 #parameter_set = ['a','b','c','alpha','beta','gamma']
 #parameter_set = ['a','b','c','beta','trans','rot','conf']
 #parameter_set = ['trans','rot']
-parameter_set = ['a','b','c','beta','trans','rot','conf']
-#parameter_set = ['conf']
+#parameter_set = ['a','b','c','beta','trans','rot','conf']
+parameter_set = ['conf']
 directory = os.path.abspath('../data/test/') + "/"
 vol_high = 3.0
 
@@ -196,7 +196,7 @@ sites = starting.get_chemical_symbols()
 # Creation of a big unit cell to extract intraatomic distances that are later used to confirm that no other short distances have been created
 big_crystal = cr.create_crystal(starting, molecule, sg, atoms, sites, [400., 400., 400., 90., 90., 90.],
                                 [100, 100, 100],
-                                [1, 0, 0, 0], [0, 0, 0, 0, 0, 0], nr_molecules[choice])
+                                [0, 0, 0], [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], nr_molecules[choice])
 close_atoms = ase.geometry.get_duplicate_atoms(big_crystal, cutoff=cut, delete=False)
 
 accepted_structures = 0
@@ -252,8 +252,8 @@ for k in range(structures):
     acc_parameters = [0, 0, 0, 0, 0]
 
     #Helper parameters for conformation change
-    trial_conf = [0,0,0,0,0,0]
-    trial_conf_old = [0,0,0,0,0,0]
+    trial_conf = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    trial_conf_old = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
     for i in range(nloop):
 
@@ -330,12 +330,8 @@ for k in range(structures):
                     if parameter == 'conf':
                         #print "test conf"
                         new_angles = mc.conf_angles(step_list[8] * alpha[i],'uniform')
-                        trial_conf[0] = new_angles[0]
-                        trial_conf[1] = new_angles[1]
-                        trial_conf[2] = new_angles[2]
-                        trial_conf[3] = new_angles[3]
-                        trial_conf[4] = new_angles[4]
-                        trial_conf[5] = new_angles[5]
+                        for l in range(23):
+                            trial_conf[l] = new_angles[l]
 
 
                     vector1 = np.array(trial_conf)

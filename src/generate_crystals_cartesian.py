@@ -19,7 +19,7 @@ import cPickle as pck
 
 import scipy.optimize as op
 
-import mc_functions as mc
+import mc_functions_v2 as mc
 
 def get_close_atoms(struct, cutoff=0.1):
     close_atoms = []
@@ -41,7 +41,12 @@ def create_crystal(structure,molecule,sg,atoms,sites,lat,trans,rotation,conf_ang
     structure.rotate(rotation[1], v='y', center=mass)
     structure.rotate(rotation[2], v='z', center=mass)
 
-    structure = mc.change_conformation(structure,conf_angles[0],conf_angles[1],conf_angles[2],conf_angles[3],conf_angles[4],conf_angles[5],molecule)
+    structure = mc.change_conformation(structure,conf_angles[0],conf_angles[1],conf_angles[2],conf_angles[3],
+                                       conf_angles[4],conf_angles[5],conf_angles[6],conf_angles[7],conf_angles[8],
+                                       conf_angles[9],conf_angles[10],conf_angles[11],conf_angles[12],conf_angles[13],
+                                       conf_angles[14],conf_angles[15],conf_angles[16],conf_angles[17],conf_angles[18],
+                                       conf_angles[19],conf_angles[20],conf_angles[21],conf_angles[22],
+                                       molecule)
 
     structure.set_cell(lat, scale_atoms=False)
 
@@ -215,7 +220,8 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
                 if 'conf' in parameter_set:
                     starting_angles = mc.conf_angles(180, 'uniform')
                 else:
-                    starting_angles = [0, 0, 0, 0, 0, 0]
+                    starting_angles = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+
 
 
                 #Overwrite the starting structure and create a trial structure for testing

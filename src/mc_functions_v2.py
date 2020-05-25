@@ -201,6 +201,25 @@ def conf_angles(angle,randomizer="gauss",molecule="cocaine"):
         angle_4 = (high_angle - low_angle) * random.random() + low_angle
         angle_5 = (high_angle - low_angle) * random.random() + low_angle
         angle_6 = (high_angle - low_angle) * random.random() + low_angle
+        angle_7 = (high_angle - low_angle) * random.random() + low_angle
+        angle_8 = (high_angle - low_angle) * random.random() + low_angle
+        angle_9 = (high_angle - low_angle) * random.random() + low_angle
+        angle_10 = (high_angle - low_angle) * random.random() + low_angle
+        angle_11 = (high_angle - low_angle) * random.random() + low_angle
+        angle_12 = (high_angle - low_angle) * random.random() + low_angle
+        angle_13 = (high_angle - low_angle) * random.random() + low_angle
+        angle_14 = (high_angle - low_angle) * random.random() + low_angle
+        angle_15 = (high_angle - low_angle) * random.random() + low_angle
+        angle_16 = (high_angle - low_angle) * random.random() + low_angle
+        angle_17 = (high_angle - low_angle) * random.random() + low_angle
+        angle_18 = (high_angle - low_angle) * random.random() + low_angle
+        angle_19 = (high_angle - low_angle) * random.random() + low_angle
+        angle_20 = (high_angle - low_angle) * random.random() + low_angle
+        angle_21 = (high_angle - low_angle) * random.random() + low_angle
+        angle_22 = (high_angle - low_angle) * random.random() + low_angle
+        angle_23 = (high_angle - low_angle) * random.random() + low_angle
+
+
     else:
         angle_1 = (high_angle - low_angle) * gauss_number() + low_angle
         angle_2 = (high_angle - low_angle) * gauss_number() + low_angle
@@ -208,10 +227,31 @@ def conf_angles(angle,randomizer="gauss",molecule="cocaine"):
         angle_4 = (high_angle - low_angle) * gauss_number() + low_angle
         angle_5 = (high_angle - low_angle) * gauss_number() + low_angle
         angle_6 = (high_angle - low_angle) * gauss_number() + low_angle
-    return [angle_1,angle_2,angle_3,angle_4,angle_5,angle_6]
+        angle_7 = (high_angle - low_angle) * random.random() + low_angle
+        angle_8 = (high_angle - low_angle) * random.random() + low_angle
+        angle_9 = (high_angle - low_angle) * random.random() + low_angle
+        angle_10 = (high_angle - low_angle) * random.random() + low_angle
+        angle_11 = (high_angle - low_angle) * random.random() + low_angle
+        angle_12 = (high_angle - low_angle) * random.random() + low_angle
+        angle_13 = (high_angle - low_angle) * random.random() + low_angle
+        angle_14 = (high_angle - low_angle) * random.random() + low_angle
+        angle_15 = (high_angle - low_angle) * random.random() + low_angle
+        angle_16 = (high_angle - low_angle) * random.random() + low_angle
+        angle_17 = (high_angle - low_angle) * random.random() + low_angle
+        angle_18 = (high_angle - low_angle) * random.random() + low_angle
+        angle_19 = (high_angle - low_angle) * random.random() + low_angle
+        angle_20 = (high_angle - low_angle) * random.random() + low_angle
+        angle_21 = (high_angle - low_angle) * random.random() + low_angle
+        angle_22 = (high_angle - low_angle) * random.random() + low_angle
+        angle_23 = (high_angle - low_angle) * random.random() + low_angle
+
+    return [angle_1,angle_2,angle_3,angle_4,angle_5,angle_6,angle_7,angle_8,angle_9,angle_10,angle_11,angle_12,angle_13,
+            angle_14,angle_15,angle_16,angle_17,angle_18,angle_19,angle_20,angle_21,angle_22,angle_23]
 
 
-def change_conformation(abc, angle_1, angle_2, angle_3, angle_4, angle_5, angle_6, molecule):
+def change_conformation(abc, angle_1, angle_2, angle_3, angle_4, angle_5, angle_6, angle_7, angle_8, angle_9, angle_10,
+                        angle_11, angle_12, angle_13, angle_14, angle_15, angle_16, angle_17, angle_18, angle_19,
+                        angle_20, angle_21, angle_22, angle_23, molecule):
 
     mask = np.zeros(len(abc))
     if molecule == "cocaine":
@@ -272,7 +312,150 @@ def change_conformation(abc, angle_1, angle_2, angle_3, angle_4, angle_5, angle_
         abc.rotate_dihedral(a1=59, a2=37, a3=33, a4=32, angle=angle_6, mask=mask)
 
     if molecule == "ritonavir":
-        pass
+        # Dih1
+        mask = np.zeros(len(abc))
+        for k1 in [56, 47, 12, 0, 46, 55, 45]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=46, a2=45, a3=44, a4=6, angle=angle_1, mask=mask)
+
+        # Dih2
+        mask = np.zeros(len(abc))
+        for k1 in [56, 47, 12, 0, 46, 55, 45, 44, 53, 54]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=45, a2=44, a3=6, a4=43, angle=angle_2, mask=mask)
+
+        # Dih3
+        mask = np.zeros(len(abc))
+        for k1 in [56, 47, 12, 0, 46, 55, 45, 44, 53, 54, 6]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=44, a2=6, a3=43, a4=11, angle=angle_3, mask=mask)
+
+        # Dih4
+        mask = np.zeros(len(abc))
+        for k1 in [56, 47, 12, 0, 46, 55, 45, 44, 53, 54, 6, 43, 5]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=6, a2=43, a3=11, a4=97, angle=angle_4, mask=mask)
+
+        # Dih5
+        mask = np.zeros(len(abc))
+        for k1 in [56, 47, 12, 0, 46, 55, 45, 44, 53, 54, 6, 43, 5, 11, 97]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=43, a2=11, a3=36, a4=72, angle=angle_5, mask=mask)
+
+        # Dih6
+        mask = np.zeros(len(abc))
+        for k1 in [38, 39, 40, 41, 42, 50, 51, 52, 49, 60, 75]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=49, a2=38, a3=37, a4=73, angle=angle_6, mask=mask)
+
+        # Dih7
+        mask = np.zeros(len(abc))
+        for k1 in [38, 39, 40, 41, 42, 50, 51, 52, 49, 60, 75, 37, 73, 74]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=38, a2=37, a3=36, a4=11, angle=angle_7, mask=mask)
+
+        # Dih8
+        mask = np.zeros(len(abc))
+        for k1 in [38, 39, 40, 41, 42, 50, 51, 52, 49, 60, 75, 37, 73, 74, 56, 47, 12, 0, 46, 55, 45, 44, 53, 54, 6, 43,
+                   5, 11, 97, 36, 72]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=11, a2=36, a3=35, a4=71, angle=angle_8, mask=mask)
+
+        # Dih9
+        mask = np.zeros(len(abc))
+        for k1 in [93, 4]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=93, a2=4, a3=35, a4=34, angle=angle_9, mask=mask)
+
+        # Dih10
+        mask = np.zeros(len(abc))
+        for k1 in [38, 39, 40, 41, 42, 50, 51, 52, 49, 60, 75, 37, 73, 74, 56, 47, 12, 0, 46, 55, 45, 44, 53, 54, 6, 43,
+                   5, 11, 97, 36, 72, 35, 71, 4, 93]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=36, a2=35, a3=34, a4=70, angle=angle_10, mask=mask)
+
+        # Dih11
+        mask = np.zeros(len(abc))
+        for k1 in [38, 39, 40, 41, 42, 50, 51, 52, 49, 60, 75, 37, 73, 74, 56, 47, 12, 0, 46, 55, 45, 44, 53, 54, 6, 43,
+                   5, 11, 97, 36, 72, 35, 71, 4, 93, 34, 69, 70]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=35, a2=34, a3=13, a4=76, angle=angle_11, mask=mask)
+
+        # Dih12
+        mask = np.zeros(len(abc))
+        for k1 in [15, 16, 17, 18, 19, 20, 79, 96, 80, 81, 82]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=21, a2=15, a3=14, a4=13, angle=angle_12, mask=mask)
+
+        # Dih13
+        mask = np.zeros(len(abc))
+        for k1 in [15, 16, 17, 18, 19, 20, 79, 96, 80, 81, 82, 14, 77, 78]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=15, a2=14, a3=13, a4=76, angle=angle_13, mask=mask)
+
+        # Dih14
+        mask = np.zeros(len(abc))
+        for k1 in [48, 59, 57, 58, 25, 85, 86, 87, 24, 84]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=25, a2=24, a3=23, a4=7, angle=angle_14, mask=mask)
+
+        # Dih15
+        mask = np.zeros(len(abc))
+        for k1 in [48, 59, 57, 58, 25, 85, 86, 87, 24, 84, 23, 7, 1, 21, 22, 83]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=22, a2=21, a3=26, a4=88, angle=angle_15, mask=mask)
+
+        # Dih16
+        mask = np.zeros(len(abc))
+        for k1 in [48, 59, 57, 58, 25, 85, 86, 87, 24, 84, 23, 7, 1, 21, 22, 83, 26, 89, 88]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=21, a2=26, a3=8, a4=28, angle=angle_16, mask=mask)
+
+        # Dih17
+        mask = np.zeros(len(abc))
+        for k1 in [48, 59, 57, 58, 25, 85, 86, 87, 24, 84, 23, 7, 1, 21, 22, 83, 26, 89, 88, 8, 27, 90, 91, 92]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=26, a2=8, a3=28, a4=2, angle=angle_17, mask=mask)
+
+        # Dih18
+        mask = np.zeros(len(abc))
+        for k1 in [48, 59, 57, 58, 25, 85, 86, 87, 24, 84, 23, 7, 1, 21, 22, 83, 26, 89, 88, 8, 27, 90, 91, 92, 28, 2]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=8, a2=28, a3=9, a4=95, angle=angle_18, mask=mask)
+
+        # Dih19
+        mask = np.zeros(len(abc))
+        for k1 in [48, 59, 57, 58, 25, 85, 86, 87, 24, 84, 23, 7, 1, 21, 22, 83, 26, 89, 88, 8, 27, 90, 91, 92, 28, 2,
+                   9, 94]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=28, a2=9, a3=32, a4=30, angle=angle_19, mask=mask)
+
+        # Dih20
+        mask = np.zeros(len(abc))
+        for k1 in [29, 61, 62, 63, 30, 64, 31, 65, 67, 66]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=29, a2=30, a3=32, a4=68, angle=angle_20, mask=mask)
+
+        # Dih21
+        mask = np.zeros(len(abc))
+        for k1 in [48, 59, 57, 58, 25, 85, 86, 87, 24, 84, 23, 7, 1, 21, 22, 83, 26, 89, 88, 8, 27, 90, 91, 92, 28, 2,
+                   9, 94, 29, 61, 62, 63, 30, 64, 31, 65, 67, 66, 32, 68]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=9, a2=32, a3=33, a4=3, angle=angle_21, mask=mask)
+
+        # Dih22
+        mask = np.zeros(len(abc))
+        for k1 in [48, 59, 57, 58, 25, 85, 86, 87, 24, 84, 23, 7, 1, 21, 22, 83, 26, 89, 88, 8, 27, 90, 91, 92, 28, 2,
+                   9, 94, 29, 61, 62, 63, 30, 64, 31, 65, 67, 66, 32, 68, 33, 3]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=32, a2=33, a3=10, a4=95, angle=angle_22, mask=mask)
+
+        # Dih23
+        mask = np.zeros(len(abc))
+        for k1 in [48, 59, 57, 58, 25, 85, 86, 87, 24, 84, 23, 7, 1, 21, 22, 83, 26, 89, 88, 8, 27, 90, 91, 92, 28, 2,
+                   9, 94, 29, 61, 62, 63, 30, 64, 31, 65, 67, 66, 32, 68, 33, 3, 10, 95]:
+            mask[k1] = 1
+        abc.rotate_dihedral(a1=33, a2=10, a3=13, a4=76, angle=angle_23, mask=mask)
 
     #print angle_1, angle_2, angle_3, angle_4, angle_5
     return abc
