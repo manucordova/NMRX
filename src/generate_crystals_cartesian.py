@@ -76,7 +76,9 @@ def get_projections(struct, alpha, beta, gamma, atoms, rotation):
     
     s = copy.deepcopy(struct)
     mass = s[0:atoms].get_center_of_mass()
-    s = rotate_molecule(s, mass, quat, atoms)
+    structure.rotate(rotation[0], v='x', center=mass)
+    structure.rotate(rotation[1], v='y', center=mass)
+    structure.rotate(rotation[2], v='z', center=mass)
     xyz = s.get_positions()[:atoms]
     
     proj_a = np.zeros(atoms)
