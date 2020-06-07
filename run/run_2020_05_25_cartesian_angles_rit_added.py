@@ -60,7 +60,7 @@ cluster = False
 # Primary parameters to change
 molecule = "cocaine"
 nloop = 2
-structures = 2
+structures = 999
 
 simplex = False
 use_energy = True
@@ -77,10 +77,10 @@ comment = '_test'
 #parameter_set = ['a','b','c']
 #parameter_set = ['a','b','c','alpha','beta','gamma','trans','rot','conf']
 #parameter_set = ['a','b','c','alpha','beta','gamma']
-#parameter_set = ['a','b','c','beta','trans','rot','conf']
+parameter_set = ['a','b','c','beta','trans','rot','conf']
 #parameter_set = ['trans','rot']
 #parameter_set = ['a','b','c','beta','trans','rot','conf']
-parameter_set = ['conf']
+#parameter_set = ['conf']
 directory = os.path.abspath('../data/test/') + "/"
 vol_high = 3.0
 
