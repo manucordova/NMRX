@@ -25,10 +25,10 @@ from ase.data import atomic_numbers, vdw_radii
 
 #Paths used for different system modules
 sys.path.insert(0, "../src")
-import mc_functions_v2 as mc
+import mc_functions_2020_06_15 as mc
 import ml_functions as ml
 import dftb_v2 as dftb
-import generate_crystals_cartesian as cr
+import generate_crystals_2020_06_15 as cr
 
 
 # np_load_old = np.load
@@ -38,7 +38,7 @@ import generate_crystals_cartesian as cr
 random.seed()
 
 #The choice of the space group
-choice = 1
+choice = 3
 space_groups = [14,19,2,4,61,115,33,9,29,5]
 nr_molecules = [4,4,2,2,8,4,4,2,4,2]
 space_group_sym = ["M","O","Triclinic","M","O","Tetragonal","O","M","O","M"]
@@ -58,7 +58,7 @@ dftb_path = which("dftb+")
 cluster = False
 
 # Primary parameters to change
-molecule = "ritonavir"
+molecule = "cocaine"
 nloop = 4000
 structures = 999
 
@@ -79,8 +79,8 @@ comment = '_test'
 #parameter_set = ['a','b','c','alpha','beta','gamma']
 #parameter_set = ['a','b','c','trans','rot','conf']
 #parameter_set = ['trans','rot']
-#parameter_set = ['a','b','c','beta','trans','rot','conf']
-parameter_set = ['a','b','c','trans','rot','conf']
+parameter_set = ['a','b','c','beta','trans','rot','conf']
+#parameter_set = ['a','b','c','trans','rot','conf']
 #parameter_set = ['a','b','c','trans','rot']
 directory = os.path.abspath('../data/test/') + "/"
 vol_high = 3.0
@@ -113,11 +113,11 @@ energy_constant = 0 #1233197.53153
 
 #initial_structure_original = os.path.abspath("../input_structures/{}/{}.pdb".format(molecule, molecule))
 
-if molecule == "cocaine":
+if molecule == "cocaine": #space group 4
     initial_structure_original = '../input_structures/cocaine/COCAIN10_H_relaxed_out_cell_vc-relax_DFTBplus.pdb'
     atoms = 43
     # energy_constant = 276900
-if molecule == "azd":
+if molecule == "azd": #space group 2
     initial_structure_original = '../input_structures/azd8329/azd8329_csp.vc-relax.pdb'
     atoms = 62
     # energy_constant = 376543
@@ -194,7 +194,9 @@ Vmol = sum(rad) * nr_molecules[choice]
 lat = starting.get_cell_lengths_and_angles()
 sites = starting.get_chemical_symbols()
 
-# Creation of a big unit cell to extract intraatomic distances that are later used to confirm that no other short distances have been created
+# Extract intra atomic distances to later use for checking that no new close distances have been created.
+# Need an option to manually add distances, like possible hydrogen bonds (or aromatic rings stacking)
+# abc=starting[:atoms]
 big_crystal = cr.create_crystal(starting, molecule, sg, atoms, sites, [400., 400., 400., 90., 90., 90.],
                                 [100, 100, 100],
                                 [0, 0, 0], [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], nr_molecules[choice])
@@ -219,6 +221,7 @@ for k in range(structures):
 
     write(directory + name + '/' + experiment + "_" + str(k) + '_init_structure.cif', trial_crystal)
     print("Reasonable structure found after {} tries!".format(n_failed))
+    print(starting_angles)
 
     all_costs = []
     all_chi_H = []

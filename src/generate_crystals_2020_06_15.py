@@ -64,7 +64,7 @@ def get_third_length_low(a, b, alpha, beta, gamma, Vmol):
     sqroot = np.sqrt(sqroot)
     return Vmol / (a*b*sqroot)
 
-def get_projections(struct, alpha, beta, gamma, atoms, rotation):
+def get_projections(struct, alpha, beta, gamma, atoms, rotation, conf_angles, molecule):
     unit_a = np.array([1,0,0])
     unit_b = np.zeros(3)
     unit_b[0] = np.cos(np.deg2rad(gamma))
@@ -79,12 +79,18 @@ def get_projections(struct, alpha, beta, gamma, atoms, rotation):
     s.rotate(rotation[0], v='x', center=mass)
     s.rotate(rotation[1], v='y', center=mass)
     s.rotate(rotation[2], v='z', center=mass)
+    s = mc.change_conformation(s,conf_angles[0],conf_angles[1],conf_angles[2],conf_angles[3],
+                                       conf_angles[4],conf_angles[5],conf_angles[6],conf_angles[7],conf_angles[8],
+                                       conf_angles[9],conf_angles[10],conf_angles[11],conf_angles[12],conf_angles[13],
+                                       conf_angles[14],conf_angles[15],conf_angles[16],conf_angles[17],conf_angles[18],
+                                       conf_angles[19],conf_angles[20],conf_angles[21],conf_angles[22],
+                                       molecule)
     xyz = s.get_positions()[:atoms]
     
     proj_a = np.zeros(atoms)
     proj_b = np.zeros(atoms)
     proj_c = np.zeros(atoms)
-    
+
     for i, pos in enumerate(xyz):
         proj_a[i] = pos.T.dot(unit_a)
         proj_b[i] = pos.T.dot(unit_b)
@@ -106,6 +112,8 @@ def check_for_overlap(trial_crystal, cut, close_atoms, Vmol, vol_high,old_overla
     else:
         overlapping_atoms = ase.geometry.get_duplicate_atoms(trial_crystal, cutoff=cut, delete=False)
 
+
+
     count = 0
     for aa in overlapping_atoms:
         for bb in close_atoms:
@@ -115,8 +123,6 @@ def check_for_overlap(trial_crystal, cut, close_atoms, Vmol, vol_high,old_overla
 
     Vcell = trial_crystal.get_volume()
     condition_2 = (Vcell > Vmol and Vcell < vol_high * Vmol)
-
-    print condition_1, condition_2
 
     return condition_1 and condition_2
 
@@ -132,6 +138,24 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
     Vmol = sum(rad)*n_mol
     
     n_failed = 0
+
+
+    if 'conf' in parameter_set:
+        while True:
+            starting_copy = copy.deepcopy(starting)
+            abc = starting_copy[:atoms]
+            starting_angles = mc.conf_angles(180, 'uniform')
+            trial_crystal= mc.change_conformation(abc, starting_angles[0], starting_angles[1], starting_angles[2], starting_angles[3],
+                                               starting_angles[4], starting_angles[5], starting_angles[6], starting_angles[7],
+                                               starting_angles[8], starting_angles[9], starting_angles[10], starting_angles[11], starting_angles[12],
+                                               starting_angles[13], starting_angles[14], starting_angles[15], starting_angles[16], starting_angles[17],
+                                               starting_angles[18], starting_angles[19], starting_angles[20], starting_angles[21], starting_angles[22],
+                                                  molecule)
+            if check_for_overlap(trial_crystal, cut, close_atoms, Vmol, vol_high, old_overlap):
+                print "Dihedrals calculated"
+                break
+    else:
+        starting_angles = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     
     while True:
         while True:
@@ -178,7 +202,7 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
 
                 if smart_cell:
                     cell_l = ["a", "b", "c"]
-                    low_lens = get_projections(starting, lat[3], lat[4], lat[5], atoms, rotation)
+                    low_lens = get_projections(starting, lat[3], lat[4], lat[5], atoms, rotation, starting_angles, molecule)
                     tmp_l = [0., 0.]
                     for i, x in enumerate(np.random.permutation(cell_l)):
                         ind_l = cell_l.index(x)
@@ -220,11 +244,6 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
                     trans = [x, y, z]
                 else:
                     trans = [0, 0, 0]
-
-                if 'conf' in parameter_set:
-                    starting_angles = mc.conf_angles(180, 'uniform')
-                else:
-                    starting_angles = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
 
 
