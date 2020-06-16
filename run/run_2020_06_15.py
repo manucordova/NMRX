@@ -62,7 +62,7 @@ molecule = "cocaine"
 nloop = 4000
 structures = 999
 
-simplex = False
+simplex = True
 use_energy = True
 C13 = False #Not yet implemented for azd #think about including for bigger molecules like ritonavir
 H1 = False
@@ -70,7 +70,7 @@ H_cutoff= 0.1
 #rotation_cycles = 10
 factor = 0.005
 experiment = "1"
-comment = '_test'
+comment = ''
 #parameter_set = ['']
 #parameter_set = ['rot']
 #parameter_set = ['c']
@@ -82,7 +82,7 @@ comment = '_test'
 parameter_set = ['a','b','c','beta','trans','rot','conf']
 #parameter_set = ['a','b','c','trans','rot','conf']
 #parameter_set = ['a','b','c','trans','rot']
-directory = os.path.abspath('../data/test/') + "/"
+directory = os.path.abspath('../data/2020_06_16_coc_dih_uniform/') + "/"
 vol_high = 3.0
 
 

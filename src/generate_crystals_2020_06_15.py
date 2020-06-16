@@ -255,8 +255,6 @@ def generate_crystal(starting, parameter_set, high_angle, low_angle, high_trans,
                 print(e)
                 pass
 
-        write('/Users/balodis/github/NMRX/data/test_structure.cif', trial_crystal) #remove later
-        print(lat) #remove later
 
         #print check_for_overlap(trial_crystal,cut,close_atoms,Vmol,vol_high)
         Vs.append(trial_crystal.get_volume())
