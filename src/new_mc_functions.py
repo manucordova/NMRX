@@ -245,8 +245,6 @@ def to_minimize(x, struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_se
     new_R = copy.deepcopy(R)
     new_conf = copy.deepcopy(conf_angles)
     
-    print(x)
-    
     # Set optimized parameters
     k = 0
     # Lattice parameters
@@ -323,7 +321,7 @@ def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, 
     for k, p in enumerate(["a", "b", "c", "alpha", "beta", "gamma"]):
         if p in parameter_set:
             x0.append(lat[k])
-            bounds.append((0, 2*lat[k]))
+            bounds.append((1., 2*lat[k]))
     # Translation
     if "trans" in parameter_set:
         x0.extend(list(trans))
@@ -339,7 +337,7 @@ def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, 
             bounds.append((0., 360.))
 
     # Optimize cost function
-    res = op.minimize(to_minimize, x0, args=(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params, verbose), method="L-BFGS-B", bounds=bounds, options={"eps":1e-6, "ftol":1e-2})
+    res = op.minimize(to_minimize, x0, args=(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params, verbose), method="TNC", bounds=bounds, options={"eps":1e-6, "ftol":1e-2})
     
     opt_lat = copy.deepcopy(lat)
     opt_trans = copy.deepcopy(trans)
