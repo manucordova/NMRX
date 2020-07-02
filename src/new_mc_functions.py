@@ -339,7 +339,7 @@ def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, 
             bounds.append((0., 360.))
 
     # Optimize cost function
-    res = op.minimize(to_minimize, x0, args=(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params, verbose), method="TNC", bounds=bounds, options={"eps":1e-4, "ftol":1e-2})
+    res = op.minimize(to_minimize, x0, args=(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params, verbose), method="L-BFGS-B", bounds=bounds, options={"eps":1e-6, "ftol":1e-2})
     
     opt_lat = copy.deepcopy(lat)
     opt_trans = copy.deepcopy(trans)
