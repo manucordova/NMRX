@@ -59,10 +59,10 @@ cluster = False
 
 # Primary parameters to change
 molecule = "cocaine"
-nloop = 9999
-structures = 2
+nloop = 0
+structures = 100
 
-simplex = True
+simplex = False
 use_energy = True
 C13 = False #Not yet implemented for azd #think about including for bigger molecules like ritonavir
 H1 = False
