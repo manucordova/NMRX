@@ -49,7 +49,7 @@ sym = "M"
 ### Parameters for the chemical system under study
 molecule = "cocaine"
 experiment = "1"
-comment = "fix_T_and_step_factor"
+comment = "linear_T_simplex"
 # Directory for results
 out_dir = "../data/test_cocaine/"
 ### TODO: Change to make general
@@ -95,21 +95,21 @@ weighted = True
 # Initial step size of each parameter: unit cell length, unit cell angle, translation (fraction of unit cell length), rotation, dihedral angle
 init_step_size = [2., 20., 0.05, 30., 40.]
 # How much does the amplitude of a step change after each step
-step_factor = 1.
+step_factor = 2.
 # Maximum volume (ratio w.r.t. volume of the molecule * number of molecules in unit cell) for the initial unit cell
 max_V_factor = 2.
 # Use smart cell generation
 smart_cell = True
 # Minimum and maximum values of unit cell lengths and angles
-cell_params_lims = [5., 20., 45., 135.]
+cell_params_lims = [1., 50., 45., 135.]
 # Number of structures to run
-n_structures = 1
+n_structures = 10
 # Number of Monte-Carlo loops (only valid if the criterion for stopping the MC run is not variable)
-n_loops = 1
+n_loops = 1000
 # Criterion for stopping the MC run. T=temperature, [TODO: Additional criterions and T profiles]
 stopping_criterion = "T"
-T_start = 300.
-T_stop = 300.
+T_start = 1000.
+T_stop = 1.
 T_profile = "linear"
 # Gas constant (kJ/(mol*K))
 gas_cst = 8.314e-3
@@ -133,8 +133,11 @@ equivalent = {}
 ambiguous = {}
 # 1H
 if molecule == "cocaine":
+    # Experimental chemical shifts: the shifts should be in the order of the input structure
     cost_options["H"]["exp_shifts"] = [3.76, 3.78, 5.63, 3.06, 3.32, 3.49, 3.38, 2.91, 2.56, 2.12, 8.01, 8.01, 8.01, 8.01, 8.01, 3.78, 3.78, 3.78, 1.04, 1.04, 1.04]
+    # Equivalent shifts, where computed shifts should be averaged
     cost_options["H"]["equivalent"] = [[10, 11, 12, 13, 14], [15, 16, 17], [18, 19, 20]]
+    # Ambiguous shifts, where best matching criterion should be used
     cost_options["H"]["ambiguous"] = [[3, 4], [6, 7], [8, 9]]
 # 13C
 # TODO: check 13C
@@ -172,8 +175,7 @@ if not os.path.exists(out_dir):
 if stopping_criterion == "T":
     name = "{}_loops_".format(n_loops)
     for c in cost_function:
-        if c != "E":
-            name += "{}_factor_{}_".format(c, cost_factors[c])
+        name += "{}_factor_{}_".format(c, cost_factors[c])
     name += "{}_{}".format(comment, experiment)
     if simplex:
         name += "_simplex"
@@ -325,8 +327,6 @@ for k in range(n_structures):
                 all_costs[c].append(old_cost[c])
             for p in parameter_set:
                 all_params[p].append(mc.current_parameter(p, lat, trans, R, conf_angles))
-            print(sel_params)
-            print(acc_params)
                 
         
         # Save parameter list
@@ -341,13 +341,13 @@ for k in range(n_structures):
     ### Simplex optimization
     ###########################################################################################
     if simplex:
-        opt_crystal, opt_lat, opt_trans, opt_R, opt_conf = mc.simplex_opt(starting_structure, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params=conf_params, verbose=verbose)
+        opt_crystal, opt_lat, opt_trans, opt_R, opt_conf = mc.simplex_opt(starting_structure, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, cell_params_lims, conf_params=conf_params, verbose=verbose)
         
         opt_cost = mc.compute_cost(opt_crystal, cost_function, cost_factors, cost_options)
         
         opt_params ={}
         for p in parameter_set:
-            opt_params[p].append(mc.current_parameter(p, opt_lat, opt_trans, opt_R, opt_conf))
+            opt_params[p] = mc.current_parameter(p, opt_lat, opt_trans, opt_R, opt_conf)
         
         # Save parameter list
         if verbose:
@@ -356,4 +356,3 @@ for k in range(n_structures):
             
         # Write the final crystal structure
         ase.io.write(out_dir + name + "/opt_crystal_{}.cif".format(k), opt_crystal)
-# TODO: Simplex

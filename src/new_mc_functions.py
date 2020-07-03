@@ -248,9 +248,9 @@ def to_minimize(x, struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_se
     # Set optimized parameters
     k = 0
     # Lattice parameters
-    for p in ["a", "b", "c", "alpha", "beta", "gamma"]:
+    for m, p in enumerate(["a", "b", "c", "alpha", "beta", "gamma"]):
         if p in parameter_set:
-            new_lat[k] = x[k]
+            new_lat[m] = x[k]
             k += 1
     # Translation
     if "trans" in parameter_set:
@@ -289,7 +289,7 @@ def to_minimize(x, struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_se
 
 
 
-def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params=None, verbose=False):
+def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, cell_params_lims, conf_params=None, verbose=False):
     """
     Optimize the cost function with respect to parameters
     
@@ -316,28 +316,22 @@ def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, 
     
     # Set initial parameters
     x0 = []
-    bounds = []
     # Lattice parameters
     for k, p in enumerate(["a", "b", "c", "alpha", "beta", "gamma"]):
         if p in parameter_set:
             x0.append(lat[k])
-            bounds.append((1., 2*lat[k]))
     # Translation
     if "trans" in parameter_set:
         x0.extend(list(trans))
-        bounds.extend([(0., 1.), (0., 1.), (0., 1.)])
     # Rotation
     if "rot" in parameter_set:
         x0.extend([1., 0., 0., 0.])
-        bounds.extend([(-1., 1.), (-1., 1.), (-1., 1.), (-180., 180.)])
     # Conformation
     if "conf" in parameter_set:
         x0.extend(list(conf_angles))
-        for i in range(len(conf_angles)):
-            bounds.append((0., 360.))
 
     # Optimize cost function
-    res = op.minimize(to_minimize, x0, args=(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params, verbose), method="TNC", bounds=bounds, options={"eps":1e-6, "ftol":1e-2})
+    res = op.minimize(to_minimize, x0, args=(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params, verbose), method="Nelder-Mead", options={"fatol":1e-2})
     
     opt_lat = copy.deepcopy(lat)
     opt_trans = copy.deepcopy(trans)
