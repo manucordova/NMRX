@@ -157,4 +157,8 @@ def shift_rmsd(struct, e, options):
     # Convert to shifts
     _, _, _, rmse = best_fit_given_params(options["exp_shifts"], preds[:N], options["equivalent"], options["ambiguous"], options["slope"], options["offset"])
     
+    # If the chemical shift RMSE is smaller than the cutoff value set, return zero
+    if rmse < options["cutoff"]:
+        return 0.
+    
     return rmse
