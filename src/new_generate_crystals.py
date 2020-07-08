@@ -99,7 +99,6 @@ def check_clash(structure, n_atoms, pbc=True, clash_type="intra", factor=0.85):
     
     """
     
-    # TODO: Make this faster
     if clash_type not in ["intra", "inter"]:
         raise ValueError("Unknown clash type: {}".format(clash_type))
     
@@ -117,23 +116,27 @@ def check_clash(structure, n_atoms, pbc=True, clash_type="intra", factor=0.85):
             if contacts["{}-{}".format(e1, e2)] > max_contact:
                 max_contact = contacts["{}-{}".format(e1, e2)]
     
-    # Check clashes
-    if clash_type == "intra":
-        for i in range(n_atoms-1):
-            ds = distance(pos[i], pos[i+1:n_atoms], abc, pbc=pbc)
-            if np.min(ds) < max_contact:
-                inds = np.where(ds < max_contact)[0]
-                for j in inds:
-                    if ds[j] < contacts["{}-{}".format(symbs[i], symbs[i+1+j])]:
-                        return True
-    if clash_type == "inter":
-        for i in range(n_atoms):
-            ds = distance(pos[i], pos[n_atoms:], abc, pbc=pbc)
-            if np.min(ds) < max_contact:
-                inds = np.where(ds < max_contact)[0]
-                for j in inds:
-                    if ds[j] < contacts["{}-{}".format(symbs[i], symbs[n_atoms+j])]:
-                        return True
+    try:
+        # Check clashes
+        if clash_type == "intra":
+            for i in range(n_atoms-1):
+                ds = distance(pos[i], pos[i+1:n_atoms], abc, pbc=pbc)
+                if np.min(ds) < max_contact:
+                    inds = np.where(ds < max_contact)[0]
+                    for j in inds:
+                        if ds[j] < contacts["{}-{}".format(symbs[i], symbs[i+1+j])]:
+                            return True
+        if clash_type == "inter":
+            for i in range(n_atoms):
+                ds = distance(pos[i], pos[n_atoms:], abc, pbc=pbc)
+                if np.min(ds) < max_contact:
+                    inds = np.where(ds < max_contact)[0]
+                    for j in inds:
+                        if ds[j] < contacts["{}-{}".format(symbs[i], symbs[n_atoms+j])]:
+                            return True
+    except:
+        # If there is an issue in the clash detection, assume that there is a clash
+        return True
 
     return False
 
@@ -393,6 +396,15 @@ def translate_molecule(struct, trans, n_atoms, lattice=[]):
                 xyz[i] += t*v
     struct.set_positions(xyz)
     return struct
+    
+    
+    
+def generate_random_unit_vector():
+    v = np.zeros(3)
+    v[0] = np.random.normal(loc=0., scale=1.)
+    v[1] = np.random.normal(loc=0., scale=1.)
+    v[2] = np.random.normal(loc=0., scale=1.)
+    return v / np.linalg.norm(v)
 
     
     
@@ -406,9 +418,7 @@ def generate_random_rot(A):
     """
     rot = np.zeros(4)
     # Select a random direction
-    rot[0] = np.random.normal(loc=0., scale=1.)
-    rot[1] = np.random.normal(loc=0., scale=1.)
-    rot[2] = np.random.normal(loc=0., scale=1.)
+    rot[:3] = generate_random_unit_vector()
     rot[:3] /= np.linalg.norm(rot[:3])
     # Select a random angle
     rot[3] = (np.random.random()-0.5)*A

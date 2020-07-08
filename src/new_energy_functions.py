@@ -50,7 +50,10 @@ def compute_k_points(lattice, factor):
     """
     k_points = []
     for i in range(3):
-        k_points.append(max(1, int(1 / lattice[i] / factor)))
+        try:
+            k_points.append(max(1, int(1 / lattice[i] / factor)))
+        except:
+            k_points.append(1)
     return k_points
 
 
@@ -73,18 +76,23 @@ def compute_s_values(k_points):
 
 
 
-def make_dftb_input(xyz, k_points_factor, skfdir, outdir, dispersion):
+def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=None, comp_type="sp", driver="SD", relax_elems="all", SCC=True, DFTB3=False):
     """
-    Generate input file for DFTB
+    Generate DFTB+ input file
     
-    Inputs:     - xyz               Structure of the crystal
-                - k_points_factor   Factor for the k-point grid
-                - skfdir            Directory for the Slater-Koster files
-                - outdir            Directory where the input file should be written
-                - dispersion        Type of dispersion correction to use
+    Inputs:     - xyz                   Input structure
+                - periodic              Whether the structure is periodic or not
+                - skfdir                Directory for the DFTB parameter files
+                - outdir                Output directory
+                - dispersion            Type of dispersion correction to use
+                - k_points_factor       Factor for the generation of k-points
+                - comp_type             Type of computation to run
+                - driver                Driver for relaxation
+                - relax_elems           Elements to relax
+                - SCC                   Use second-order DFTB
+                - DFTB3                 Use third-order DFTB
     """
-    
-    # Get atomic symbols and positions
+
     pos = xyz.get_positions()
     nr = xyz.get_number_of_atoms()
     typ = xyz.get_chemical_symbols()
@@ -94,9 +102,10 @@ def make_dftb_input(xyz, k_points_factor, skfdir, outdir, dispersion):
         if atom not in elements:
             elements.append(atom)
             ntyp += 1
-    # Get cell parameters
-    abc = xyz.get_cell_lengths_and_angles()
-    cell = xyz.get_cell()
+
+    if periodic:
+        abc = xyz.get_cell_lengths_and_angles()
+        cell = xyz.get_cell()
 
     pp = "Geometry = {\n"
     pp += " TypeNames = { "
@@ -104,25 +113,34 @@ def make_dftb_input(xyz, k_points_factor, skfdir, outdir, dispersion):
         pp += "\"" + elem + "\" "
     pp += "}\n TypesAndCoordinates [Angstrom] = {\n"
     for i, position in enumerate(pos):
-        pp += "  " + str(elements.index(typ[i]) + 1) + " " + str(round(position[0], 6)) + " " + str(
-            round(position[1], 6)) + " " + str(round(position[2], 6)) + "\n"
-    pp += " }\n Periodic = Yes\n"
+        pp += "  " + str(elements.index(typ[i])+1) + " " + str(round(position[0],6)) + " " + str(round(position[1],6)) + " " + str(round(position[2],6)) + "\n"
+    pp += " }\n"
+        
+    if periodic:
+        pp += " Periodic = Yes\n"
 
-    pp += " LatticeVectors [Angstrom] = {\n"
-    for k in range(3):
-        for x in range(3):
-            pp += "  " + '{:8.6f}'.format(cell[k][x])
-        pp += '\n'
-    pp += " }\n}\n"
+        pp += " LatticeVectors [Angstrom] = {\n"
+        for k in range(3):
+            for x in range(3):
+                pp += "  " + '{:8.6f}'.format(cell[k][x])
+            pp +='\n'
+        pp += " }\n"
+    pp += "}\n"
 
     pp += "Hamiltonian = DFTB {\n"
-    pp += " SCC = Yes\n"
+    if SCC:
+        pp += " SCC = Yes\n"
+        pp += " MaxSCCIterations = 500\n"
     pp += " MaxAngularMomentum = {\n"
     for elem in elements:
         if elem == "H":
             pp += "  " + elem + " = \"s\"\n"
-        elif elem in ["C", "N", "O","S"]:
+        elif elem in ["C", "N", "O"]:
             pp += "  " + elem + " = \"p\"\n"
+        elif elem in ["S", "P"]:
+            pp += "  " + elem + " = \"d\"\n"
+        else:
+            raise ValueError("No maximum angular momentum set for {}.".format(elem))
     pp += " }\n"
 
     pp += " SlaterKosterFiles = {\n"
@@ -131,21 +149,46 @@ def make_dftb_input(xyz, k_points_factor, skfdir, outdir, dispersion):
             pp += "  " + elem1 + "-" + elem2 + " = \"" + skfdir + elem1 + "-" + elem2 + ".skf\"\n"
     pp += " }\n"
 
-    k_points = compute_k_points(abc[:3], k_points_factor)
-    pp += " KPointsAndWeights = SupercellFolding {\n"
-    pp += "  " + str(k_points[0]) + " 0 0\n"
-    pp += "  0 " + str(k_points[1]) + " 0\n"
-    pp += "  0 0 " + str(k_points[2]) + "\n"
-    s_values = compute_s_values(k_points)
-    pp += "  " + str(round(s_values[0], 1)) + " " + str(round(s_values[1], 1)) + " " + str(round(s_values[2], 1)) + "\n"
-    pp += " }\n"
+    if periodic:
+        k_points = compute_k_points(abc[:3], k_points_factor)
+        pp += " KPointsAndWeights = SupercellFolding {\n"
+        pp += "  " + str(k_points[0]) + " 0 0\n"
+        pp += "  0 " + str(k_points[1]) + " 0\n"
+        pp += "  0 0 " + str(k_points[2]) + "\n"
+        s_values = compute_s_values(k_points)
+        pp += "  " + str(round(s_values[0],1)) + " " + str(round(s_values[1],1)) + " " + str(round(s_values[2],1)) + "\n"
+        pp += " }\n"
 
-    if dispersion == "D3":
-        pp += " Dispersion = DftD3 { Damping = BeckeJohnson {\n"
-        pp += "  a1 = 0.5719\n"
-        pp += "  a2 = 3.6017 }\n"
+    if DFTB3:
+        for e in elements:
+            if e not in ["H", "C", "N", "O", "S", "P"]:
+                raise ValueError("No Hubbard derivative for element {}. Cannot use third-order correction.".format(e))
+        pp += " ThirdOrder = Yes\n"
+        pp += " HubbardDerivs {\n"
+        if "H" in elements:
+            pp += "  H = -0.1857\n"
+        if "C" in elements:
+            pp += "  C = -0.1492\n"
+        if "N" in elements:
+            pp += "  N = -0.1535\n"
+        if "O" in elements:
+            pp += "  O = -0.1575\n"
+        if "S" in elements:
+            pp += "  S = -0.11\n"
+        if "P" in elements:
+            pp += "  P = -0.14\n"
+        pp += " }\n"
+
+    if dispersion == "D3H5":
+        pp += " HCorrection = H5 {}\n"
+        pp += " Dispersion = DftD3 {\n"
+        pp += "  Damping = ZeroDamping {\n"
+        pp += "    sr6 = 1.25\n"
+        pp += "    alpha6 = 29.61\n"
+        pp += "  }\n"
         pp += "  s6 = 1.0\n"
-        pp += "  s8 = 0.5883\n"
+        pp += "  s8 = 0.49\n"
+        pp += "  HHRepulsion = Yes\n"
         pp += " }\n"
     elif dispersion == "LJ":
         pp += " Dispersion = LennardJones {\n"
@@ -155,16 +198,56 @@ def make_dftb_input(xyz, k_points_factor, skfdir, outdir, dispersion):
         raise ValueError("Unknown dispersion")
 
     pp += "}\n"
-    
-    # Write the generated input file
+
+    if "relax" in comp_type:
+        pp += "Driver {\n"
+        if driver == "SD":
+            pp += " SteepestDescent{\n"
+        elif driver == "CG":
+            pp += " ConjugateGradient{\n"
+        elif driver == "gDIIS":
+            pp += " gDIIS{\n"
+        elif driver == "LBFGS":
+            pp += " LBFGS{\n"
+        else:
+            raise ValueError("Unknown driver!")
+        pp += "  MaxSteps = 500000\n"
+        pp += "  OutputPrefix = relax\n"
+        
+        if isinstance(relax_elems, str):
+            if relax_elems != "all":
+                raise ValueError("Enter a list of elements to relax")
+        else:
+            pp += "  Constraints = {\n"
+            for elem in relax_elems:
+                if elem not in elements:
+                    print("WARNING: Atomic type {} not present in the molecule {}!".format(elem, file))
+            for i, atom in enumerate(typ):
+                if atom not in relax_elems:
+                    pp += "   {} 1.0 0.0 0.0\n".format(i+1)
+                    pp += "   {} 0.0 1.0 0.0\n".format(i+1)
+                    pp += "   {} 0.0 0.0 1.0\n".format(i+1)
+            pp += "  }\n"
+
+        if comp_type == "vc-relax":
+            pp += "  LatticeOpt = Yes\n"
+        elif comp_type != "relax":
+            raise ValueError("Unknown computation type!")
+
+        pp += " }\n"
+
+        pp += "}\n"
+        
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
     with open(outdir + "/dftb_in.hsd", "w") as f:
         f.write(pp)
-        
     return
 
 
 
-def dftbplus_energy(directory, struct, dftb_path, dispersion="D3"):
+def dftbplus_energy(directory, struct, dftb_path, dispersion="D3H5"):
     """
     DFTB+ single-point energy computation
     
@@ -190,7 +273,7 @@ def dftbplus_energy(directory, struct, dftb_path, dispersion="D3"):
     k_points_factor = 0.05  # Length for k-point sampling in reciprocal space (A^-1)
 
     # Generate DFTB input file
-    make_dftb_input(struct, k_points_factor, skfdir, outdir, dispersion)
+    make_dftb_input(struct, True, skfdir, outdir, dispersion, k_points_factor=k_points_factor, comp_type="sp", SCC=True, DFTB3=True)
 
     # Move to the input file directory
     os.chdir(outdir)
@@ -203,8 +286,12 @@ def dftbplus_energy(directory, struct, dftb_path, dispersion="D3"):
     output, error = process.communicate()
     outputStr = output.decode("utf-8").split("\n")
     out = [s for s in outputStr if 'Total Energy' in s]
-    E = [float(s) for s in out[0].split(" ") if s.replace(".", "", 1).replace("-", "", 1).isdigit()]
     # Remove the temporary directory
     shutil.rmtree(outdir)
+    try:
+        E = [float(s) for s in out[0].split(" ") if s.replace(".", "", 1).replace("-", "", 1).isdigit()]
+    except:
+        print("Energy computation failed!")
+        return 0
 
     return E[0]
