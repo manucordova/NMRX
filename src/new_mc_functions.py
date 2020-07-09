@@ -345,8 +345,6 @@ def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, 
         for _ in range(len(conf_angles)):
             bounds.append((0., 360.))
 
-    for i in range(len(x0)):
-        print(x0[i],bounds[i])
     # Optimize cost function
     res = op.minimize(to_minimize, x0, args=(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params, verbose), method="Nelder-Mead", options={"fatol":1e-2})
     
@@ -720,13 +718,12 @@ def optimize_trans(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_
         # Get minimum cost and associated translation vector index
         min_cost = np.min(cost_grid)
         best_inds = np.where(np.isclose(cost_grid, min_cost, atol=1e-6, rtol=1e-12))
-        print(best_inds)
         num_1 = -1
         opt_inds = (1,1,1)
         for i in range(len(best_inds[0])):
             # if the best cost is in the central index, restart the optimization with a reduced step size
             if best_inds[0][i] == 1 and best_inds[1][i] == 1 and best_inds[2][i] == 1:
-                print(best_cost["Tot"], min_cost, "Central")
+                print("Min, decreasing step size")
                 return optimize_trans(struct, best_cost, bounds, lat, opt_trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
             # Get indices that are closest to the center as the central indices
             n = 0
@@ -970,6 +967,7 @@ def iterative_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set
                 - cost_factors          Factors of each part of the cost function
                 - cost_options          Options for the parts of the cost function
                 - conf_params           Atoms and masks in conformer angles
+                - n_max                 Maximum number of optimization iterations
                 - verbose               Verbosity level
                 - step                  Step size (fraction of range of each parameter)
                 - ftol                  Tolerance for convergence of the cost function
@@ -996,9 +994,9 @@ def iterative_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set
     opt_conf = copy.deepcopy(conf_angles)
     tmp_cost = copy.deepcopy(best_cost)
     
-    N = 0
+    k = 0
     while not converged:
-        N += 1
+        k += 1
         best_cost = copy.deepcopy(tmp_cost)
         # Optimize cell parameters
         for p in ["a", "b", "c", "alpha", "beta", "gamma"]:
@@ -1037,7 +1035,7 @@ def iterative_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set
                 converged = True
                 print("Converged!")
         
-        if N > N_max:
+        if not converged and k >= n_max:
             converged = True
             print("Max number of optimization runs reached!")
 
