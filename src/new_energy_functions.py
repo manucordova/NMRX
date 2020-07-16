@@ -295,3 +295,35 @@ def dftbplus_energy(directory, struct, dftb_path, dispersion="D3H5"):
         return 0
 
     return E[0]
+
+
+
+def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.):
+    """
+    Compute the cost associated with the selected distance constraints
+    """
+    
+    # Get number of molecules in the unit cell
+    symbs = struct.get_chemical_symbols()
+    n_mol = int(len(symbs)/n_atoms)
+    
+    cost = 0
+    
+    # For each pair of atoms that should be close
+    for p in pairs:
+        ds = []
+        # Get all possible distances (intra- and intermolecular)
+        for i in range(n_mol):
+            for j in range(n_mol):
+                ds.append(struct.get_distance(p[0]+(i*n_atoms), p[1]+(j*n_atoms), mic=True))
+        if len(ds) < 1:
+            raise ValueError("Error when computing the distance for pair {}-{}".format(p[0], p[1]))
+        
+        # Get minimum distance
+        d = np.min(ds)
+        
+        # Get associated cost
+        if d > thresh:
+            cost += (d-thresh)**exponent
+    
+    return cost

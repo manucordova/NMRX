@@ -63,6 +63,8 @@ def compute_cost_part(struct, cost_type, cost_options):
         cost = en.dftbplus_energy(cost_options["directory"], struct, cost_options["dftb_path"])
     elif cost_type in symb2z.keys():
         cost = ml.shift_rmsd(struct, cost_type, cost_options)
+    elif cost_type == "D":
+        cost = en.compute_distance_constraints(struct, cost_options["n_atoms"], cost_options["pairs"], cost_options["thresh"], cost_options["exponent"])
     else:
         raise ValueError("Unknown cost function type: {}".format(cost_type))
 

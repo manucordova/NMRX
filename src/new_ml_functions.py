@@ -159,6 +159,6 @@ def shift_rmsd(struct, e, options):
     
     # If the chemical shift RMSE is smaller than the cutoff value set, return zero
     if rmse < options["cutoff"]:
-        return 0.
+        return options["cutoff"]
     
     return rmse

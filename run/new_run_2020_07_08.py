@@ -89,10 +89,8 @@ if molecule == "ritonavir":  # space group 19
 
 ### Parameters for the simulation
 # Set of parameters to change
-#parameter_set = ["a", "b", "c"]
 parameter_set = ["a", "b", "c", "beta", "trans", "rot", "conf"]
-parameter_set = ["rot"]
-#parameter_set = ["a", "b", "c", "beta"]
+# Whether random choices are between all parameters (True) or between groups of parameters (False, like cell lengths, cell angles, conformers)
 weighted = True
 # Initial step size of each parameter: unit cell length, unit cell angle, translation (fraction of unit cell length), rotation, dihedral angle
 init_step_size = [2., 20., 0.05, 30., 40.]
@@ -101,13 +99,13 @@ step_factor = 2.
 # Maximum volume (ratio w.r.t. volume of the molecule * number of molecules in unit cell) for the initial unit cell
 max_V_factor = 2.
 # Use smart cell generation
-smart_cell = False
+smart_cell = True
 # Minimum and maximum values of unit cell lengths and angles
 cell_params_lims = [1., 50., 45., 135.]
 # Number of structures to run
 n_structures = 10
 # Number of Monte-Carlo loops (only valid if the criterion for stopping the MC run is not variable)
-n_loops = 10
+n_loops = 1000
 # Criterion for stopping the MC run. T=temperature, [TODO: Additional criterions and T profiles]
 stopping_criterion = "T"
 T_start = 1000.
@@ -153,7 +151,7 @@ dftb_pgm_name = "dftb+"
 # Is the simulation running on the cluster?
 cluster = False
 # Set a seed for random number generation
-seed = 12345
+seed = None
 # Write crystal structure at each MC step
 write_intermediates = False
 # Verbosity
