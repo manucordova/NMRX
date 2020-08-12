@@ -298,17 +298,26 @@ def dftbplus_energy(directory, struct, dftb_path, dispersion="D3H5"):
 
 
 
-def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.):
+def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2., c_type="avg"):
     """
     Compute the cost associated with the selected distance constraints
+    
+    Inputs:     - struct        Input structure
+                - n_atoms       Number of atoms in a single molecule
+                - pairs         Pairs of atoms to compute the constraints for (should refer to the atoms in the
+                                    first molecule, although the constraints will be evaluated both for intramolecular
+                                    and intermolecular contacts)
+                - thresh        Threshold for distance constraints. Can be a single number or an array of numbers.
+                - exponent      Exponent to raise the computed costs to.
+                - c_type        Type of constraint (sum == sum, avg == average, rmsd == root-mean-square deviation
+                                    [overrides the exponent variable])
     """
     
     # Get number of molecules in the unit cell
     symbs = struct.get_chemical_symbols()
     n_mol = int(len(symbs)/n_atoms)
     
-    cost = 0
-    
+    min_ds = []
     # For each pair of atoms that should be close
     for p in pairs:
         ds = []
@@ -320,10 +329,20 @@ def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.)
             raise ValueError("Error when computing the distance for pair {}-{}".format(p[0], p[1]))
         
         # Get minimum distance
-        d = np.min(ds)
+        min_ds.append(np.min(ds))
         
-        # Get associated cost
-        if d > thresh:
-            cost += (d-thresh)**exponent
+    # Retract the threshold from the minimum distance
+    min_ds = np.array(min_ds)
+    min_ds -= thresh
+    # Set negative values to zero (constraint is fulfilled)
+    min_ds[min_ds < 0] = 0
     
-    return cost
+    # Return the corresponding cost
+    if c_type == "sum":
+        return np.sum(np.power(min_ds, exponent))
+    elif c_type == "avg":
+        return np.mean(np.power(min_ds, exponent))
+    elif c_type == "rmsd":
+        return np.sqrt(np.mean(np.square(min_ds)))
+    else:
+        raise ValueError("Unknown constraint type: {}".format(c_type))
