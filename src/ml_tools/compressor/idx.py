@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 class IDXFilter(BaseEstimator,TransformerMixin):
     def __init__(self,Iselect,kernel,act_on='sample',disable_pbar=True):
-	self.Iselect = Iselect
+        self.Iselect = Iselect
         self.kernel = kernel
         self.disable_pbar = disable_pbar
         self.transformation_mat = None

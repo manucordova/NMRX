@@ -70,33 +70,33 @@ cen = [atom_symbols[num] for num in list(set([atom_valence[centre] for centre in
 xyzfile = read(fname,':')
 
 if randomnum > 0:
-    print("Shuffling coordinates and taking %i of them."%randomnum)
+    print "Shuffling coordinates and taking %i of them."%randomnum
     if sparsefile != '':
-        print("Random option is not compatible with supplying a sparsification filename!")
+        print "Random option is not compatible with supplying a sparsification filename!"
         sys.exit(0)
     if ncut == -1:
-        print("Option ncut must be specified for use with random option!")
+        print "Option ncut must be specified for use with random option!"
         sys.exit(0)
     random.shuffle(xyzfile)
     xyzfile = xyzfile[:randomnum]
 
 if fpsnum > 0:
-    print("Taking the first %i of the coordinates."%fpsnum)
+    print "Taking the first %i of the coordinates."%fpsnum
     if sparsefile != '':
-        print("This option is not compatible with supplying a sparsification filename!")
+        print "This option is not compatible with supplying a sparsification filename!"
         sys.exit(0)
     if ncut == -1:
-        print("Option ncut must be specified for use with this option!")
+        print "Option ncut must be specified for use with this option!"
         sys.exit(0)
     xyzfile = xyzfile[:fpsnum]
 
 npoints = len(xyzfile)
-all_names = [xyzfile[i].get_chemical_symbols() for i in range(npoints)]
-coords = [xyzfile[i].get_positions() for i in range(npoints)]
+all_names = [xyzfile[i].get_chemical_symbols() for i in xrange(npoints)]
+coords = [xyzfile[i].get_positions() for i in xrange(npoints)]
 if periodic == True:
-    cell = [xyzfile[i].get_cell() for i in range(npoints)]
+    cell = [xyzfile[i].get_cell() for i in xrange(npoints)]
 else:
-    cell = [0.0 for i in range(npoints)]
+    cell = [0.0 for i in xrange(npoints)]
 
 
 # Process input names
@@ -113,13 +113,13 @@ for k in unique_names:
 # List number of atoms for each configuration
 natmax = len(max(all_names, key=len))
 nat = np.zeros(npoints,dtype=int)
-for i in range(npoints):
+for i in xrange(npoints):
     nat[i] = len(all_names[i])
 
 # List indices for atom of the same species for each configuration
-atom_indexes = [[[] for j in range(nsmax)] for i in range(npoints)]
-for i in range(npoints):
-    for ii in range(nat[i]):
+atom_indexes = [[[] for j in xrange(nsmax)] for i in xrange(npoints)]
+for i in xrange(npoints):
+    for ii in xrange(nat[i]):
         for j in all_species:
             if all_names[i][ii] == atom_symbols[j]:
                 atom_indexes[i][j].append(ii)
@@ -139,8 +139,8 @@ lvalues = {}
 if lam > 0: # needed for tensorial stuff
     llmax=0
     lvalues = {}
-    for l1 in range(lmax+1):
-        for l2 in range(lmax+1):
+    for l1 in xrange(lmax+1):
+        for l2 in xrange(lmax+1):
             if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
                lvalues[llmax] = [l1,l2] 
                llmax+=1
@@ -149,35 +149,35 @@ start = time.time()
 
 # COMPUTE POWER SPECTRUM OF ORDER LAMBDA
 [power,featsize] = utils.compute_power_spectrum(natmax,lam,lmax,npoints,nspecies,nnmax,nmax,llmax,lvalues,centers,atom_indexes,all_species,coords,cell,rc,rk,cw,sigma,sg,orthomatrix,sparse_options)
-print("Power spectrum computed", time.time()-start) 
+print "Power spectrum computed", time.time()-start 
 
-print("starting feature space dimension", featsize)
-print("sparsifing power spectrum ....")
+print "starting feature space dimension", featsize
+print "sparsifing power spectrum ...."
 start_sparse = time.time()
 
 # Sparsification options.
 if sparsefile != '':
-    print("We have already sparsified the power spectrum with pre-loaded parameters.")
+    print "We have already sparsified the power spectrum with pre-loaded parameters."
     psparse = power.reshape((2*lam+1)*npoints*natmax,len(power[0,0]))
     featsize = len(psparse[0])
 elif ncut > 0:
     # We have not provided a file with sparsification details, but we do want to sparsify, so we'll do it from scratch.
-    print("Doing furthest-point sampling sparsification.")
+    print "Doing furthest-point sampling sparsification."
     sparsefilename = str(lam)+"_nconf"+str(npoints)+"_sigma"+str(sg)+"_lmax"+str(lmax)+"_nmax"+str(nmax)+"_cutoff"+str(rc)+"_rkill"+str(rk)+"_cweight"+str(cw)+"_init"+str(featsize)
     [psparse,sparse_details] = utils.FPS_sparsify(power.reshape((2*lam+1)*npoints*natmax,featsize),featsize,ncut)
     featsize = len(psparse[0])
-    print("Saving sparsification details")
+    print "Saving sparsification details"
     sparsefilename += "_final"+str(featsize)+".npy"
     if args.outfile != '':
         sparsefilename = args.outfile
     np.save("SPARSE_fps"+sparsefilename,sparse_details[0])
     np.save("SPARSE_Amat"+sparsefilename,sparse_details[1])
 else:
-    print("Power spectrum will not be sparsified.")
+    print "Power spectrum will not be sparsified."
     psparse = power.reshape((2*lam+1)*npoints*natmax,featsize)
    
-print("done", time.time()-start_sparse) 
-print("final feature space dimension", featsize)
+print "done", time.time()-start_sparse 
+print "final feature space dimension", featsize
 
 # Reshape power spectrum
 
@@ -189,8 +189,8 @@ else:
 if lam > 0 and zeta > 1:
     # compute scalar power spectrum
     [power0,featsize0] = utils.compute_power_spectrum(natmax,0,lmax,npoints,nspecies,nnmax,nmax,llmax,lvalues,centers,atom_indexes,all_species,coords,cell,rc,rk,cw,sigma,sg,orthomatrix,sparse_options)
-    print("Scalar power spectrum computed")
-    print("sparsifing scalar power spectrum ....")
+    print "Scalar power spectrum computed"
+    print "sparsifing scalar power spectrum ...."
     start_sparse = time.time()
     # SPARSIFY POWER SPECTRUM
     if ncut > 0:
@@ -202,7 +202,7 @@ if lam > 0 and zeta > 1:
 
 # Print power spectrum, if we have not asked for only a sample to be taken (we assume that taking a subset is just for the purpose of generating a sparsification)
 if randomnum == -1 and fpsnum == -1:
-    print("Saving power spectrum")
+    print "Saving power spectrum"
     PS_file="PS"+str(lam)+"_nconf"+str(npoints)+"_sigma"+str(sg)+"_lmax"+str(lmax)+"_nmax"+str(nmax)+"_cutoff"+str(rc)+"_rkill"+str(rk)+"_cweight"+str(cw)+"_ncut"+str(ncut)+".npy"
     if args.outfile != '':
         PS_file = args.outfile
@@ -213,4 +213,4 @@ if randomnum == -1 and fpsnum == -1:
             PS_file = "lambda0_"+args.outfile
         np.save(PS_file,power0)
 
-print("Full calculation of power spectrum complete")
+print "Full calculation of power spectrum complete"

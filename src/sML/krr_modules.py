@@ -37,7 +37,7 @@ def pca(X,Threshold=0.99,space=False):
     var = np.array(var)
     until = np.where(var<Threshold)[0][-1]
     
-    print "You have reduced the initial space of ", X.shape[1], " dimensions to ", until
+    print("You have reduced the initial space of ", X.shape[1], " dimensions to ", until)
     if space:
         return np.dot(mX,v[:,:until]), v[:,:until]
     else:
@@ -55,14 +55,14 @@ def do_fps(x, d=0,robust=False):
         iy[0] = 0
         dl = n2 + n2[iy[0]] - 2* np.dot(x, x[iy[0]])
         dss = []
-        for i in xrange(1,d):
+        for i in range(1,d):
             iy[i] = np.argmax(dl)
             nd = n2 + n2[iy[i]] - 2*np.dot(x,x[iy[i]])
             dl = np.minimum(dl, nd)
             dss.append(max(dl))
     else: 
         # First, we take a good model estimate 
-        print "Will implement something smarter"
+        print("Will implement something smarter")
     return iy,dss
 
 def bootstrap_krr_train(ktrain,ytrain,delta,jitter=1e-8,nmodels=10):
@@ -88,12 +88,12 @@ def bootstrap_krr_train(ktrain,ytrain,delta,jitter=1e-8,nmodels=10):
     evals = evs(k)
     if np.min(evals) < 0.0:
         jitter = 2*np.abs(np.min(evals))
-    print "jitter ",jitter
+    print("jitter ",jitter)
     del k
     
     training_model_indices = []
     for j in range(nmodels):
-        print j
+        print(j)
         # pick ntrs CV training points from among the full training set
         irs[j] = np.random.choice(itrain, nrs, replace=False)
         invirs = np.setdiff1d(itrain, irs[j])
@@ -201,7 +201,7 @@ def best_sigma_cv(kmm,kmn,y,delta,ddelta,jitter):
             bestscore = score
             bestdelta = currdelta
 
-    print "Best result we get is :", bestscore," with a sigma of :", bestdelta
+    print("Best result we get is :", bestscore," with a sigma of :", bestdelta)
     return bestdelta,bestscore
 
 
@@ -220,7 +220,7 @@ def bootstrap_krr_train_PP(kmm,kmn,ytrain,delta,jitter=1e-8,nmodels=10):
     itrain = np.arange(ntrain) # indices of training configurations
     
     nrs = ntrain/2 # 2-fold cross validation split
-    print nrs
+    print(nrs)
     ypred  = np.zeros((nmodels, ntrain)) 
     krr = []
     irs = np.zeros((nmodels, nrs), int)
@@ -232,12 +232,12 @@ def bootstrap_krr_train_PP(kmm,kmn,ytrain,delta,jitter=1e-8,nmodels=10):
     evals = evs(k)
     if np.min(evals) < 0.0:
         jitter = 2*np.abs(np.min(evals))
-    print "jitter ",jitter
+    print("jitter ",jitter)
     del k
     
     training_model_indices = []
     for j in range(nmodels):
-        print j
+        print(j)
         # pick ntrs CV training points from among the full training set
         irs[j] = np.random.choice(itrain, nrs, replace=False)
         invirs = np.setdiff1d(itrain, irs[j])

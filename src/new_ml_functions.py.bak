@@ -36,7 +36,7 @@ def load_kernel(sp=1):
                 - zeta              [?]
     """
     # Loading the models
-    print("Loading the model for : {}".format(sp))
+    print "Loading the model for : ", sp
 
     kernelDir = os.path.abspath("../src/ShiftML_kernels/") + "/"
 
@@ -44,7 +44,7 @@ def load_kernel(sp=1):
         model_numbers = json.load(f)
     # Load up FPS selection
     trainsoaps = np.load(kernelDir + 'sparse_{}_20000_soap_vectors.npy'.format(sp))[:20000]
-    krrs = np.load(kernelDir + 'sparse_{}_20000_model.npy'.format(sp), allow_pickle=True, encoding="latin1")
+    krrs = np.load(kernelDir + 'sparse_{}_20000_model.npy'.format(sp), allow_pickle=True)
     zeta = model_numbers['hypers']['zeta']
     global_species = [1, 6, 7, 8, 16]
     nocenters = copy(global_species)
@@ -52,7 +52,7 @@ def load_kernel(sp=1):
     soap_params = model_numbers['soaps']
     representation = RawSoapQUIP(**soap_params)
 
-    print("The model is ready")
+    print "The model is ready"
 
     return krrs, representation, trainsoaps, model_numbers, zeta
 

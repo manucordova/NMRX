@@ -6,6 +6,14 @@ import re
 from string import Template
 from ..utils import tqdm_cs
 
+def ase2qp(aseatoms):
+    from quippy import Atoms as qpAtoms
+    positions = aseatoms.get_positions()
+    cell = aseatoms.get_cell()
+    numbers = aseatoms.get_atomic_numbers()
+    pbc = aseatoms.get_pbc()
+    return qpAtoms(numbers=numbers,cell=cell,positions=positions,pbc=pbc)
+
 def get_chunks(lenght,chunk_lenght):
     Nchunk = lenght // chunk_lenght
     rest = lenght % chunk_lenght
@@ -46,11 +54,14 @@ def get_Nsoap(spkitMax,nmax,lmax):
                 Nsoap += nmax*(nmax+1)*(lmax+1) / 2 
             elif sp1 > sp2:
                 Nsoap += nmax**2*(lmax+1)
-    return int(Nsoap) + 1 
+    return Nsoap + 1 
 
 def get_rawsoap(frame,soapstr,nocenters, global_species, rc, nmax, lmax,awidth,
                 centerweight,cutoff_transition_width, 
                  cutoff_dexp, cutoff_scale,cutoff_rate):
+    frame = ase2qp(frame)
+    frame.set_cutoff(rc)
+    frame.calc_connect()
     global_speciesstr = '{'+re.sub('[\[,\]]', '', str(global_species))+'}'
     nspecies = len(global_species)
     
@@ -75,7 +86,7 @@ def get_rawsoap(frame,soapstr,nocenters, global_species, rc, nmax, lmax,awidth,
                                  rc=rc, nmax=nmax, lmax=lmax, awidth=awidth,cutoff_dexp=cutoff_dexp, 
                                   cutoff_scale=cutoff_scale,centerweight=centerweight)
     desc = descriptors.Descriptor(soapstr2)
-    soap = desc.calc(frame, grad=False)['data']
+    soap = desc.calc(frame, grad=False)['descriptor']
     return soap  
 
 class RawSoapQUIP(AtomicDescriptorBase):
@@ -113,7 +124,7 @@ class RawSoapQUIP(AtomicDescriptorBase):
                             'central_weight=$centerweight covariance_sigma0=0.0 atom_sigma=$awidth',
                             'cutoff=$rc cutoff_transition_width=$cutoff_transition_width n_max=$nmax l_max=$lmax', 
                             'n_species=$nspecies species_Z=$species n_Z=$ncentres Z=$centres']))
-        print(soapstr)        
+        print soapstr        
         
         Nsoap = get_Nsoap(self.soap_params['global_species'],self.soap_params['nmax'],
                           self.soap_params['lmax'])
@@ -125,7 +136,7 @@ class RawSoapQUIP(AtomicDescriptorBase):
         else:
             soaps = np.empty((Nenv,Nsoap))
 
-        for iframe in tqdm_cs(list(range(Nframe)),desc='RawSoap',leave=True,disable=self.disable_pbar):
+        for iframe in tqdm_cs(range(Nframe),desc='RawSoap',leave=True,disable=self.disable_pbar):
             soap = get_rawsoap(frames[iframe],soapstr,**self.soap_params)
                         
             if self.fast_avg:

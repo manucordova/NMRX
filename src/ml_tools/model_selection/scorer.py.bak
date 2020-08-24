@@ -24,7 +24,7 @@ class CrossValidationScorer(BaseEstimator):
         aa = self.estimator.get_params()
         aa.pop('trainer')
         self.params = dict(cv=self.cv.get_params(),estimator=aa,
-                          score_type=list(self.score_func.keys()))
+                          score_type=self.score_func.keys())
         
     def fit(self,X,y):
         self.scores = {k:[] for k in self.score_func}
@@ -35,7 +35,7 @@ class CrossValidationScorer(BaseEstimator):
             self.estimator.fit(X_train,y_train)
             y_pred = self.estimator.predict(X_test)
             self.predictions.append(dict(y_ref=y_true,y_pred=y_pred))
-            for k,func in self.score_func.items():
+            for k,func in self.score_func.iteritems():
                 self.scores[k].append(func(y_true,y_pred))
             
         self.score = {k:np.mean(self.scores[k]) for k in self.score_func}
@@ -47,7 +47,7 @@ class CrossValidationScorer(BaseEstimator):
         if txt is False:
             return dict(score=self.score,predictions=self.predictions)
         else:
-            return ' '.join([k+'={:.3e}'.format(v) for k,v in self.score.items()])
+            return ' '.join([k+'={:.3e}'.format(v) for k,v in self.score.iteritems()])
     def get_params(self,deep=True):
         return self.params
     def pack(self):
@@ -96,7 +96,7 @@ class SoRCrossValidationScorer(CrossValidationScorer):
             y_pred = np.dot(alpha,kernel_test).flatten()
             
             self.predictions.append(dict(y_ref=y_true,y_pred=y_pred))
-            for k,func in self.score_func.items():
+            for k,func in self.score_func.iteritems():
                 self.scores[k].append(func(y_true,y_pred))
             
         self.score = {k:np.mean(self.scores[k]) for k in self.score_func}

@@ -23,7 +23,7 @@ def cg(phi, b, x0, lam=1.0, maxiter=1000, tol=1.0e-25):
     p[0] = r[0]
     norm[0] = np.linalg.norm(r[0])**2
 
-    for i in xrange(maxiter):
+    for i in range(maxiter):
 
         lab1 = i%2
         lab2 = (i+1)%2

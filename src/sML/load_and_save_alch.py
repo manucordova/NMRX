@@ -21,19 +21,19 @@ def order_soap(soap, species, nspecies, nab, subspecies, nsubspecies, nsubab, \
     #translate the fingerprints from QUIP
     counter = 0
     p = np.zeros((nsubspecies, nsubspecies, nmax, nmax, lmax + 1))
-    rs_index = [(i%nmax, (i - i%nmax)/nmax) for i in xrange(nmax*nsubspecies)]
-    for i in xrange(nmax*nsubspecies):
-        for j in xrange(i + 1):
+    rs_index = [(i%nmax, (i - i%nmax)/nmax) for i in range(nmax*nsubspecies)]
+    for i in range(nmax*nsubspecies):
+        for j in range(i + 1):
             if i != j: mult = np.sqrt(0.5)
             else: mult = 1.0
-            for k in xrange(lmax + 1):
+            for k in range(lmax + 1):
                 n1, s1 = rs_index[i]
                 n2, s2 = rs_index[j]
                 p[s1, s2, n1, n2, k] = soap[counter]*mult
                 if s1 == s2: p[s1, s2, n2, n1, k] = soap[counter]*mult
                 counter += 1
-    for s1 in xrange(nsubspecies):
-        for s2 in xrange(s1):
+    for s1 in range(nsubspecies):
+        for s2 in range(s1):
             p[s2, s1] = p[s1, s2].transpose((1, 0, 2))
 
     p = p.reshape((nsubspecies, nsubspecies, nn))
@@ -52,8 +52,8 @@ def order_soap(soap, species, nspecies, nab, subspecies, nsubspecies, nsubab, \
 
         p2 = np.zeros((nalch*(nalch + 1)/2, nn))
         k = 0
-        for i in xrange(nalch):
-            for j in xrange(i, nalch):
+        for i in range(nalch):
+            for j in range(i, nalch):
                 if i == j: mult = 1.0
                 else: mult = np.sqrt(2.0)
                 p2[k] = p[i, j]*mult
@@ -63,8 +63,8 @@ def order_soap(soap, species, nspecies, nab, subspecies, nsubspecies, nsubab, \
     else:
         p2 = np.zeros((nab, nn))
         k = 0
-        for i in xrange(nspecies):
-            for j in xrange(i, nspecies):
+        for i in range(nspecies):
+            for j in range(i, nspecies):
                 if i == j: mult = 1.0
                 else: mult = np.sqrt(2.0)
                 p2[k] = p[i, j]*mult
@@ -80,7 +80,7 @@ def indices(nframes, width=0, aod='asc'):
     #would use nonlocal variables rather than a dictionary in python3
     d = {'k':0, 'l':0}
     n = nframes/width
-    x = [i*width for i in xrange(n + 1)]
+    x = [i*width for i in range(n + 1)]
     if x[n] != nframes: 
         x += [nframes]
         n += 1
@@ -88,7 +88,7 @@ def indices(nframes, width=0, aod='asc'):
     #return ascending indices (top to bottom)
     if aod == 'asc':
         def inner():
-            ind = xrange(x[d['k']], x[d['k'] + 1])
+            ind = range(x[d['k']], x[d['k'] + 1])
             d['k'] += 1 
             if d['k'] >= n: 
                 d['l'] += 1
@@ -98,7 +98,7 @@ def indices(nframes, width=0, aod='asc'):
     #return descending indices (right to left)
     else:
         def inner():
-            ind = xrange(x[n - d['k'] + d['l']- 1], x[n - d['k'] + d['l']])
+            ind = range(x[n - d['k'] + d['l']- 1], x[n - d['k'] + d['l']])
             d['k'] += 1 
             if d['k'] >= n: 
                 d['l'] += 1
@@ -117,7 +117,7 @@ def get_soaps(soapstr, rc, species, nspecies, nmax, lmax, nn, nab, u, sparse, fa
     def inner(frames):
         soaps_list = []
         n = len(frames)
-        for i in xrange(n):
+        for i in range(n):
 
             frame = frames[i]
             frame.set_cutoff(rc)
@@ -135,7 +135,7 @@ def get_soaps(soapstr, rc, species, nspecies, nmax, lmax, nn, nab, u, sparse, fa
                 soaps = np.zeros((nenv, nn*nalch*(nalch + 1)/2))
             else: 
                 soaps = np.zeros((nenv, nn*nab))
-            for j in xrange(nenv):
+            for j in range(nenv):
                 soaps[j] = order_soap(soap[j], species, nspecies, nab, subspecies, \
                                       nsubspecies, nsubab, nmax, lmax, nn, u)
             if fastavg == True:
@@ -192,7 +192,7 @@ def main(suffix, fxyz, rc, species, nmax, lmax, awidth, nframes, fu, sparse, wid
         try:
             u = np.load(fu)
         except:
-            print "Cannot find the u data"
+            print("Cannot find the u data")
             sys.exit()
     else:
         u = None
@@ -225,7 +225,7 @@ def main(suffix, fxyz, rc, species, nmax, lmax, awidth, nframes, fu, sparse, wid
     gsoaps = get_soaps(soapstr, rc, species, nspecies, nmax, lmax, nn, nab, u, sparse, fastavg)
     
     counter = 0
-    for i in xrange(n):
+    for i in range(n):
 
         inds1 = ind1()
         #have we reached the end of the training set?
@@ -246,11 +246,11 @@ def main(suffix, fxyz, rc, species, nmax, lmax, awidth, nframes, fu, sparse, wid
                 glob_kernel[0, inds1[0]:inds1[-1]+1, inds1[0]:inds1[-1]+1] = np.dot(soaps1, soaps1.T)
 
             counter += 1
-            print 'Calculated block %i of %i' % (counter, n*(n + 1)/2)
+            print('Calculated block %i of %i' % (counter, n*(n + 1)/2))
             sys.stdout.flush()
 
             #off-diagonal
-            for j in xrange(n - i - 1):
+            for j in range(n - i - 1):
                 inds2 = ind2()
                 soaps_list2 = gsoaps([frames[l] for l in inds2])
                 if sparse == True:
@@ -263,13 +263,13 @@ def main(suffix, fxyz, rc, species, nmax, lmax, awidth, nframes, fu, sparse, wid
                     glob_kernel[0, inds1[0]:inds1[-1]+1, inds2[0]:inds2[-1]+1] = np.dot(soaps1, soaps2.T)
 
                 counter += 1
-                print 'Calculated block %i of %i' % (counter, n*(n + 1)/2)
+                print('Calculated block %i of %i' % (counter, n*(n + 1)/2))
                 sys.stdout.flush()
 
         else:
 
             #diagonal
-            nenvs1 = [0] + [soaps_list1[k].shape[0] for k in xrange(len(soaps_list1))]
+            nenvs1 = [0] + [soaps_list1[k].shape[0] for k in range(len(soaps_list1))]
             nenvs1 = np.cumsum(nenvs1)
 
             if sparse == False: 
@@ -281,22 +281,22 @@ def main(suffix, fxyz, rc, species, nmax, lmax, awidth, nframes, fu, sparse, wid
                 del soaps_list1
                 env_kernel = sl_stacked1.dot(sl_stacked1.T).toarray()
 
-            for zeta in xrange(3):
+            for zeta in range(3):
                 glob_block = np.zeros((len(nenvs1)-1, len(nenvs1)-1))
                 get_average(glob_block, env_kernel, nenvs1, nenvs1, zeta+1)
                 glob_kernel[zeta, inds1[0]:inds1[-1]+1, inds1[0]:inds1[-1]+1] = glob_block
 
             counter += 1
-            print 'Calculated block %i of %i' % (counter, n*(n + 1)/2)
+            print('Calculated block %i of %i' % (counter, n*(n + 1)/2))
             sys.stdout.flush()
             gc.collect()
 
             #off-diagonal
-            for j in xrange(n - i - 1):
+            for j in range(n - i - 1):
 
                 inds2 = ind2()
                 soaps_list2 = gsoaps([frames[l] for l in inds2])
-                nenvs2 = [0] + [soaps_list2[k].shape[0] for k in xrange(len(soaps_list2))]
+                nenvs2 = [0] + [soaps_list2[k].shape[0] for k in range(len(soaps_list2))]
                 nenvs2 = np.cumsum(nenvs2)
 
                 if sparse == False: 
@@ -306,13 +306,13 @@ def main(suffix, fxyz, rc, species, nmax, lmax, awidth, nframes, fu, sparse, wid
                     sl_stacked2 = sp.vstack(soaps_list2)
                     env_kernel = sl_stacked1.dot(sl_stacked2.T).toarray()
 
-                for zeta in xrange(3):
+                for zeta in range(3):
                     glob_block = np.zeros((len(nenvs1)-1, len(nenvs2)-1))
                     get_average(glob_block, env_kernel, nenvs1, nenvs2, zeta+1)
                     glob_kernel[zeta, inds1[0]:inds1[-1]+1, inds2[0]:inds2[-1]+1] = glob_block[:, :]
 
                 counter += 1
-                print 'Calculated block %i of %i' % (counter, n*(n + 1)/2)
+                print('Calculated block %i of %i' % (counter, n*(n + 1)/2))
                 sys.stdout.flush()
                 gc.collect()
 
@@ -321,20 +321,20 @@ def main(suffix, fxyz, rc, species, nmax, lmax, awidth, nframes, fu, sparse, wid
 
     if fastavg == True:
 
-        for i in xrange(nframes):
-            for j in xrange(i, nframes):
+        for i in range(nframes):
+            for j in range(i, nframes):
                 glob_kernel[0, j, i] = glob_kernel[0, i, j]
 
-        for zeta in xrange(1):
+        for zeta in range(1):
             np.save('kernel'+suffix+'_zeta'+str(zeta+1)+'.npy', glob_kernel[zeta])
 
     else:
 
-        for i in xrange(nframes):
-            for j in xrange(i, nframes):
+        for i in range(nframes):
+            for j in range(i, nframes):
                 glob_kernel[:, j, i] = glob_kernel[:, i, j]
 
-        for zeta in xrange(3):
+        for zeta in range(3):
             np.save('kernel'+suffix+'_zeta'+str(zeta+1)+'.npy', glob_kernel[zeta])
 
 ##########################################################################################
