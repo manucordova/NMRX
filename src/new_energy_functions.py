@@ -14,7 +14,7 @@ import ase
 import ase.io
 import subprocess as sp
 import shutil
-
+import dftbplus as dftb
 
 
 def which(pgm):
@@ -278,23 +278,34 @@ def dftbplus_energy(directory, struct, dftb_path, dispersion="D3H5"):
     # Move to the input file directory
     os.chdir(outdir)
     # Run DFTB
-    process = sp.Popen(dftb_path, stdout=sp.PIPE)
+    #process = sp.Popen(dftb_path, stdout=sp.PIPE)
+
+    h = dftb.DftbPlus(libpath="/home/cordova/dftbplus/lib/libdftbplus.so", hsdpath=outdir+"/dftb_in.hsd", logfile=outdir+"/dftb.out")
+
+    E = h.get_energy()
+
+    h.close()
+
+    os.chdir(initdir)
+    shutil.rmtree(outdir)
+
+    return E
 
     # Come back to initial directory
-    os.chdir(initdir)
+    #os.chdir(initdir)
     # Obtain energy
-    output, error = process.communicate()
-    outputStr = output.decode("utf-8").split("\n")
-    out = [s for s in outputStr if 'Total Energy' in s]
+    #output, error = process.communicate()
+    #outputStr = output.decode("utf-8").split("\n")
+    #out = [s for s in outputStr if 'Total Energy' in s]
     # Remove the temporary directory
-    shutil.rmtree(outdir)
-    try:
-        E = [float(s) for s in out[0].split(" ") if s.replace(".", "", 1).replace("-", "", 1).isdigit()]
-    except:
-        print("Energy computation failed!")
-        return 0
+    #shutil.rmtree(outdir)
+    #try:
+    #    E = [float(s) for s in out[0].split(" ") if s.replace(".", "", 1).replace("-", "", 1).isdigit()]
+    #except:
+    #    print("Energy computation failed!")
+    #    return 0
 
-    return E[0]
+    #return E[0]
 
 
 
