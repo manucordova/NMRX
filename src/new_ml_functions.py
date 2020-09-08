@@ -12,6 +12,33 @@ import os
 import sys
 import json
 import itertools as it
+import psutil
+
+import gc
+
+def get_obj_size(obj):
+    marked = {id(obj)}
+    obj_q = [obj]
+    sz = 0
+
+    while obj_q:
+        sz += sum(map(sys.getsizeof, obj_q))
+
+        # Lookup all the object referred to by the object in obj_q.
+        # See: https://docs.python.org/3.7/library/gc.html#gc.get_referents
+        all_refr = ((id(o), o) for o in gc.get_referents(*obj_q))
+
+        # Filter object that are already marked.
+        # Using dict notation will prevent repeated objects.
+        new_refr = {o_id: o for o_id, o in all_refr if o_id not in marked and not isinstance(o, type)}
+
+        # The new obj_q will be the ones that were not marked,
+        # and we will update marked with their ids so we will
+        # not traverse them again.
+        obj_q = new_refr.values()
+        marked.update(new_refr.keys())
+
+    return sz
 
 
 # Import ShiftML libraries
@@ -60,17 +87,27 @@ def load_kernel(sp=1):
 
 def predict_shifts(frames_test, krrs, representation, trainsoaps, model_numbers, zeta, sp=1):
     # Loading test properties
+    
+    ### THIS LINE FUCKS UP THE MEMORY USAGE
     rawsoaps = representation.transform(frames_test)
-    # print "Loaded SOAPS for {}".format(z2symb[sp])
+    ###
+    #rawsoaps = np.load("tmp.npy")
+    
+    process = psutil.Process(os.getpid())
+    print(process.memory_info().rss/1024/1024)
+    
+    #print("Loaded SOAPS")
 
     x_test = rawsoaps[:, np.array(model_numbers['space'])]
+
     x_test /= np.linalg.norm(x_test, axis=1)[:, np.newaxis]
     Ktest = np.dot(x_test, trainsoaps.T) ** zeta
 
-    y_pred = bootstrap_krr_predict_PP(Ktest, krrs, model_numbers['alpha_bs'], model_numbers['indices_bs']) + \
-             model_numbers['y_offset']
+    y_pred = bootstrap_krr_predict_PP(Ktest, krrs, model_numbers['alpha_bs'], model_numbers['indices_bs']) + model_numbers['y_offset']
+
     y_best = y_pred.mean(axis=0)
     y_err  = y_pred.std(axis=0)
+
     return y_best, y_err
     
     

@@ -74,6 +74,7 @@ def get_rawsoap(frame,soapstr,nocenters, global_species, rc, nmax, lmax,awidth,
                                   cutoff_transition_width=cutoff_transition_width,
                                  rc=rc, nmax=nmax, lmax=lmax, awidth=awidth,cutoff_dexp=cutoff_dexp, 
                                   cutoff_scale=cutoff_scale,centerweight=centerweight)
+    print(soapstr2)
     desc = descriptors.Descriptor(soapstr2)
     soap = desc.calc(frame, grad=False)['data']
     return soap  
@@ -113,7 +114,6 @@ class RawSoapQUIP(AtomicDescriptorBase):
                             'central_weight=$centerweight covariance_sigma0=0.0 atom_sigma=$awidth',
                             'cutoff=$rc cutoff_transition_width=$cutoff_transition_width n_max=$nmax l_max=$lmax', 
                             'n_species=$nspecies species_Z=$species n_Z=$ncentres Z=$centres']))
-        print(soapstr)        
         
         Nsoap = get_Nsoap(self.soap_params['global_species'],self.soap_params['nmax'],
                           self.soap_params['lmax'])
@@ -136,6 +136,7 @@ class RawSoapQUIP(AtomicDescriptorBase):
                 soaps[slices[iframe]] = lil_matrix(soap)
             else:
                 soaps[slices[iframe]] = soap
+                
         if self.is_sparse:
             soaps = soaps.tocsr(copy=False)
         self.slices = slices

@@ -9,7 +9,7 @@ from ase.io import read,write
 import sys,os
 from copy import copy
 import quippy as qp
-sys.path.insert(0,'/Users/manuelcordova/Desktop/Work/ml_tools/')
+sys.path.insert(0,'../ml_tools/')
 from ml_tools.descriptors.quippy_interface import RawSoapQUIP
 from ml_tools.models.KRR import KRR,KRR_PP
 from ml_tools.kernels.kernels import KernelPower,KernelPP

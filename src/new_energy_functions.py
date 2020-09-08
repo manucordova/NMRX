@@ -39,6 +39,23 @@ def which(pgm):
 
 
 
+def spawn(cluster, out_dir, name):
+    number = str(np.random.random())
+    if cluster:
+        dftb_root = "/dev/shm/"
+    else:
+        dftb_root = out_dir + name + "/"
+    
+    dftb_dir = dftb_root + number + "_tmp/"
+    if not os.path.exists(dftb_dir):
+        os.mkdir(dftb_dir)
+    
+    process = sp.Popen([], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
+    
+    return process, dftb_dir
+
+
+
 def compute_k_points(lattice, factor):
     """
     Generate k-points from the distance in k-space (given by the k-point factor)
@@ -130,7 +147,7 @@ def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=N
     pp += "Hamiltonian = DFTB {\n"
     if SCC:
         pp += " SCC = Yes\n"
-        pp += " MaxSCCIterations = 500\n"
+        pp += " MaxSCCIterations = 50\n"
     pp += " MaxAngularMomentum = {\n"
     for elem in elements:
         if elem == "H":
@@ -277,39 +294,29 @@ def dftbplus_energy(directory, struct, dftb_path, dispersion="D3H5"):
 
     # Move to the input file directory
     os.chdir(outdir)
-    # Run DFTB
-    #process = sp.Popen(dftb_path, stdout=sp.PIPE)
 
-    h = dftb.DftbPlus(libpath="/home/cordova/dftbplus/lib/libdftbplus.so", hsdpath=outdir+"/dftb_in.hsd", logfile=outdir+"/dftb.out")
-
-    E = h.get_energy()
-
-    h.close()
-
-    os.chdir(initdir)
-    shutil.rmtree(outdir)
-
-    return E
+    # Run DFTB and get output
+    output = sp.run([dftb_path], capture_output=True)
+    outputStr = output.stdout.decode("utf-8").split("\n")
 
     # Come back to initial directory
-    #os.chdir(initdir)
+    os.chdir(initdir)
     # Obtain energy
     #output, error = process.communicate()
-    #outputStr = output.decode("utf-8").split("\n")
-    #out = [s for s in outputStr if 'Total Energy' in s]
+    out = [s for s in outputStr if 'Total Energy' in s]
     # Remove the temporary directory
-    #shutil.rmtree(outdir)
-    #try:
-    #    E = [float(s) for s in out[0].split(" ") if s.replace(".", "", 1).replace("-", "", 1).isdigit()]
-    #except:
-    #    print("Energy computation failed!")
-    #    return 0
+    shutil.rmtree(outdir)
+    try:
+        E = [float(s) for s in out[0].split(" ") if s.replace(".", "", 1).replace("-", "", 1).isdigit()]
+    except:
+        print("Energy computation failed!")
+        return 0
 
-    #return E[0]
+    return E[0]
 
 
 
-def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2., c_type="avg"):
+def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2., contact=False, c_type="avg"):
     """
     Compute the cost associated with the selected distance constraints
     
@@ -320,6 +327,8 @@ def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.,
                                     and intermolecular contacts)
                 - thresh        Threshold for distance constraints. Can be a single number or an array of numbers.
                 - exponent      Exponent to raise the computed costs to.
+                - contact       Whether the penalty should be incurred for larger (True) or smaller (False) distance
+                                    than the threshold. Can be a single boolean or an array of booleans or indices.
                 - c_type        Type of constraint (sum == sum, avg == average, rmsd == root-mean-square deviation
                                     [overrides the exponent variable])
     """
@@ -333,9 +342,10 @@ def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.,
     for p in pairs:
         ds = []
         # Get all possible distances (intra- and intermolecular)
-        for i in range(n_mol):
-            for j in range(n_mol):
-                ds.append(struct.get_distance(p[0]+(i*n_atoms), p[1]+(j*n_atoms), mic=True))
+        js = []
+        for j in range(n_mol):
+            js.append(p[1]+(j*n_atoms))
+        ds.extend(struct.get_distances(p[0], js, mic=True))
         if len(ds) < 1:
             raise ValueError("Error when computing the distance for pair {}-{}".format(p[0], p[1]))
         
@@ -345,6 +355,16 @@ def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.,
     # Retract the threshold from the minimum distance
     min_ds = np.array(min_ds)
     min_ds -= thresh
+    
+    # Invert the sign if a contact is expected
+    if type(contact) == bool:
+        if contact:
+            min_ds *= -1.
+    elif type(contact) == list:
+        min_ds[contact] *= -1.
+    else:
+        raise ValueError("The variable contact should be a boolean or a list, not {}".format(type(contact)))
+    
     # Set negative values to zero (constraint is fulfilled)
     min_ds[min_ds < 0] = 0
     
