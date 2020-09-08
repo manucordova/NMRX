@@ -88,7 +88,8 @@ def get_rawsoap(frame,soapstr,nocenters, global_species, rc, nmax, lmax,awidth,
     soap = []
     for s in outputStr:
         if "DESC" in s:
-            soap.append([float(x) for x in s.split()[1:]])
+            soap.append(np.fromstring(s[5:], dtype=float, count=-1, sep=' '))
+            #soap.append([float(x) for x in s.split()[1:]])
     soap = np.array(soap)
     ###
     
