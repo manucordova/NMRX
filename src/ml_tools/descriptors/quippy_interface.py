@@ -6,6 +6,12 @@ import re
 from string import Template
 from ..utils import tqdm_cs
 
+### TEMPORARY FIX FOR QUIP INTERFACE
+import subprocess as sp
+import ase
+import ase.io
+###
+
 def get_chunks(lenght,chunk_lenght):
     Nchunk = lenght // chunk_lenght
     rest = lenght % chunk_lenght
@@ -74,9 +80,20 @@ def get_rawsoap(frame,soapstr,nocenters, global_species, rc, nmax, lmax,awidth,
                                   cutoff_transition_width=cutoff_transition_width,
                                  rc=rc, nmax=nmax, lmax=lmax, awidth=awidth,cutoff_dexp=cutoff_dexp, 
                                   cutoff_scale=cutoff_scale,centerweight=centerweight)
-    print(soapstr2)
-    desc = descriptors.Descriptor(soapstr2)
-    soap = desc.calc(frame, grad=False)['data']
+    
+    ### TEMPORARY FIX FOR QUIP INTERFACE
+    ase.io.write("tmp.xyz", frame)
+    output = sp.run(["quip", "atoms_filename=\"tmp.xyz\"", "descriptor_str=\"{}\"".format(soapstr2)], capture_output=True)
+    outputStr = output.stdout.decode("utf-8").split("\n")
+    soap = []
+    for s in outputStr:
+        if "DESC" in s:
+            soap.append([float(x) for x in s.split()[1:]])
+    soap = np.array(soap)
+    ###
+    
+    #desc = descriptors.Descriptor(soapstr2)
+    #soap = desc.calc(frame, grad=False)['data']
     return soap  
 
 class RawSoapQUIP(AtomicDescriptorBase):

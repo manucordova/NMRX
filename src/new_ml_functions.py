@@ -61,12 +61,10 @@ def predict_shifts(frames_test, krrs, representation, trainsoaps, model_numbers,
     # Loading test properties
     
     ### THIS LINE FUCKS UP THE MEMORY USAGE
+    ### UPDATE: corresponding function was changed with a temporary fix
     rawsoaps = representation.transform(frames_test)
     ###
     #rawsoaps = np.load("tmp.npy")
-    
-    process = psutil.Process(os.getpid())
-    print(process.memory_info().rss/1024/1024)
     
     #print("Loaded SOAPS")
 
