@@ -10,6 +10,7 @@ from ..utils import tqdm_cs
 import subprocess as sp
 import ase
 import ase.io
+import os
 ###
 
 def get_chunks(lenght,chunk_lenght):
@@ -82,8 +83,9 @@ def get_rawsoap(frame,soapstr,nocenters, global_species, rc, nmax, lmax,awidth,
                                   cutoff_scale=cutoff_scale,centerweight=centerweight)
     
     ### TEMPORARY FIX FOR QUIP INTERFACE
-    ase.io.write("tmp.xyz", frame)
-    output = sp.run(["quip", "atoms_filename=\"tmp.xyz\"", "descriptor_str=\"{}\"".format(soapstr2)], capture_output=True)
+    name = str(np.random.rand()) + ".xyz"
+    ase.io.write(name, frame)
+    output = sp.run(["quip", "atoms_filename=\"{}\"".format(name), "descriptor_str=\"{}\"".format(soapstr2)], capture_output=True)
     outputStr = output.stdout.decode("utf-8").split("\n")
     soap = []
     for s in outputStr:
@@ -91,6 +93,8 @@ def get_rawsoap(frame,soapstr,nocenters, global_species, rc, nmax, lmax,awidth,
             soap.append(np.fromstring(s[5:], dtype=float, count=-1, sep=' '))
             #soap.append([float(x) for x in s.split()[1:]])
     soap = np.array(soap)
+    os.remove(name)
+    os.remove(name + ".idx")
     ###
     
     #desc = descriptors.Descriptor(soapstr2)
