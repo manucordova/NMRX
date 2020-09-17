@@ -286,8 +286,6 @@ def to_minimize(x, struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_se
         cost["Tot"] = 1e12
     else:
         cost = compute_cost(new_cryst, cost_function, cost_factors, cost_options)
-        
-    print(cost)
     
     return cost["Tot"]
 
@@ -414,11 +412,11 @@ def optimize_lat_param(struct, p, best_cost, bounds, lat, trans, R, conf_angles,
     lat_ind = {"a":0, "b":1, "c":2, "alpha":3, "beta":4, "gamma":5}
     
     if verbose:
-        print("Optimizing parameter {}. Initial value {}, step size {}".format(p, lat[lat_ind[p]], step))
+        print("  Optimizing parameter {}. Initial value {}, step size {}".format(p, lat[lat_ind[p]], step))
     
     # Display warning if the initial parameters are outside the bounds
     if lat[lat_ind[p]] > bounds[1] or lat[lat_ind[p]] < bounds[0]:
-        print("WARNING: the initial parameters are outside the bounds")
+        print("  WARNING: the initial parameters are outside the bounds")
     
     # If the step size is too small, return the original lattice parameter
     if step < xtol:
@@ -458,19 +456,16 @@ def optimize_lat_param(struct, p, best_cost, bounds, lat, trans, R, conf_angles,
     else:
         tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
     
-    if verbose:
-        print("Init: {:.2f}, +: {:.2f}, -: {:.3f}".format(best_cost["Tot"], tmp_cost_p["Tot"], tmp_cost_m["Tot"]))
-    
     # If no direction is found, decrease the step size by two and try again
     if tmp_cost_p["Tot"] >= best_cost["Tot"]-1e-6 and tmp_cost_m["Tot"] >= best_cost["Tot"]-1e-6:
         if verbose:
-            print("Min, decreasing step size")
+            print("  Minimum found, decreasing step size")
         return optimize_lat_param(struct, p, best_cost, bounds, lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
         
     # If positive direction is found, increase the parameter until energy rises
     elif tmp_cost_p["Tot"] < best_cost["Tot"] and tmp_cost_p["Tot"] < tmp_cost_m["Tot"]:
         if verbose:
-            print("+")
+            print("  Increasing the parameter decreases the cost")
         # While the energy decreases
         while tmp_cost_p["Tot"] < best_cost["Tot"]:
             # Update the best parameter and associated cost
@@ -486,14 +481,14 @@ def optimize_lat_param(struct, p, best_cost, bounds, lat, trans, R, conf_angles,
             else:
                 tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
             if verbose:
-                print(best_cost["Tot"], tmp_cost_p["Tot"])
+                print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_p["Tot"]))
         # Restart the optimization with reduced step size
         return optimize_lat_param(struct, p, best_cost, bounds, best_lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
         
     # If negative direction is found, increase the parameter until energy rises
     elif tmp_cost_m["Tot"] < best_cost["Tot"] and tmp_cost_m["Tot"] < tmp_cost_p["Tot"]:
         if verbose:
-            print("-")
+            print("  Decreasing the parameter decreases the cost")
         # While the energy decreases
         while tmp_cost_m["Tot"] < best_cost["Tot"]:
             # Update the best parameter and associated cost
@@ -509,7 +504,7 @@ def optimize_lat_param(struct, p, best_cost, bounds, lat, trans, R, conf_angles,
             else:
                 tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
             if verbose:
-                print(best_cost["Tot"], tmp_cost_m["Tot"])
+                print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_m["Tot"]))
         # Restart the optimization with reduced step size
         return optimize_lat_param(struct, p, best_cost, bounds, best_lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
     
@@ -582,8 +577,8 @@ def optimize_trans(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_
     """
     
     if verbose:
-        print("Optimizing translation, step size {}".format(step))
-        print("Initial translation vector: {:.4f}, {:.4f}, {:.4f}".format(trans[0], trans[1], trans[2]))
+        print("  Optimizing translation, step size {}".format(step))
+        print("  Initial translation vector: {:.4f}, {:.4f}, {:.4f}".format(trans[0], trans[1], trans[2]))
     
     best_trans = copy.deepcopy(trans)
     
@@ -679,8 +674,8 @@ def optimize_trans(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_
     while opt_cost["Tot"] < best_cost["Tot"]-1e-6:
     
         if verbose:
-            print("Optimized translation vector: {:.4f}, {:.4f}, {:.4f}".format(opt_trans[0], opt_trans[1], opt_trans[2]))
-            print(best_cost["Tot"], opt_cost["Tot"])
+            print("  Optimized translation vector: {:.4f}, {:.4f}, {:.4f}".format(opt_trans[0], opt_trans[1], opt_trans[2]))
+            print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], opt_cost["Tot"]))
             
         best_trans = copy.deepcopy(opt_trans)
         best_cost = copy.deepcopy(opt_cost)
@@ -725,7 +720,7 @@ def optimize_trans(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_
         for i in range(len(best_inds[0])):
             # if the best cost is in the central index, restart the optimization with a reduced step size
             if best_inds[0][i] == 1 and best_inds[1][i] == 1 and best_inds[2][i] == 1:
-                print("Min, decreasing step size")
+                print("  Minimum found, decreasing step size")
                 return optimize_trans(struct, best_cost, bounds, lat, opt_trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
             # Get indices that are closest to the center as the central indices
             n = 0
@@ -772,7 +767,7 @@ def optimize_rot(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_at
     """
     
     if verbose:
-        print("Optimizing rotation. Step size: {}".format(step))
+        print("  Optimizing rotation. Step size: {}".format(step))
     
     best_R = copy.deepcopy(R)
     converged = False
@@ -802,7 +797,7 @@ def optimize_rot(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_at
         # If the energy decreases, update the rotation matrix
         if opt_cost["Tot"] < best_cost["Tot"]:
             if verbose:
-                print("Decrease in the cost function found after {} tries ({:.2f} -> {:.2f})".format(N, best_cost["Tot"], opt_cost["Tot"]))
+                print("  Decrease in the cost function found after {} tries ({:.2f} -> {:.2f})".format(N, best_cost["Tot"], opt_cost["Tot"]))
             best_cost = copy.deepcopy(opt_cost)
             best_R = copy.deepcopy(opt_R)
             N = 0
@@ -846,7 +841,7 @@ def optimize_conf(struct, i, best_cost, bounds, lat, trans, R, conf_angles, sg, 
     best_conf = copy.deepcopy(conf_angles)
 
     if verbose:
-        print("Optimizing conformer angle {}/{}. Initial value {}, step size {}".format(i+1, len(conf_angles), conf_angles[i], step))
+        print("  Optimizing conformer angle {}/{}. Initial value {}, step size {}".format(i+1, len(conf_angles), conf_angles[i], step))
 
     # If the step size is too small, return the original conformer angle
     if step < xtol:
@@ -886,19 +881,16 @@ def optimize_conf(struct, i, best_cost, bounds, lat, trans, R, conf_angles, sg, 
     else:
         tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
 
-    if verbose:
-        print("Init: {:.2f}, +: {:.2f}, -: {:.3f}".format(best_cost["Tot"], tmp_cost_p["Tot"], tmp_cost_m["Tot"]))
-
     # If no direction is found, decrease the step size by two and try again
     if tmp_cost_p["Tot"] >= best_cost["Tot"]-1e-6 and tmp_cost_m["Tot"] >= best_cost["Tot"]-1e-6:
         if verbose:
-            print("Min, decreasing step size")
+            print("  Minimum found, decreasing step size")
         return optimize_conf(struct, i, best_cost, bounds, lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
         
     # If positive direction is found, increase the parameter until energy rises
     elif tmp_cost_p["Tot"] < best_cost["Tot"] and tmp_cost_p["Tot"] < tmp_cost_m["Tot"]:
         if verbose:
-            print("+")
+            print("  Increasing the parameter decreases the cost")
         # While the energy decreases
         while tmp_cost_p["Tot"] < best_cost["Tot"]:
             # Update the best parameter and associated cost
@@ -914,14 +906,14 @@ def optimize_conf(struct, i, best_cost, bounds, lat, trans, R, conf_angles, sg, 
             else:
                 tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
             if verbose:
-                print(best_cost["Tot"], tmp_cost_p["Tot"])
+                print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_p["Tot"]))
         # Restart the optimization with reduced step size
         return optimize_conf(struct, i, best_cost, bounds, lat, trans, R, best_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
         
     # If negative direction is found, increase the parameter until energy rises
     elif tmp_cost_m["Tot"] < best_cost["Tot"] and tmp_cost_m["Tot"] < tmp_cost_p["Tot"]:
         if verbose:
-            print("-")
+            print("  Decreasing the parameter decreases the cost")
         # While the energy decreases
         while tmp_cost_m["Tot"] < best_cost["Tot"]:
             # Update the best parameter and associated cost
@@ -937,7 +929,7 @@ def optimize_conf(struct, i, best_cost, bounds, lat, trans, R, conf_angles, sg, 
             else:
                 tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
             if verbose:
-                print(best_cost["Tot"], tmp_cost_m["Tot"])
+                print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_m["Tot"]))
         # Restart the optimization with reduced step size
         return optimize_conf(struct, i, best_cost, bounds, lat, trans, R, best_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
 
@@ -1026,7 +1018,7 @@ def iterative_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set
                 opt_conf, tmp_cost = optimize_conf(struct, i, tmp_cost, bounds, opt_lat, opt_trans, opt_R, opt_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step, ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
         
         # Check for convergence (relative threshold)
-        print(best_cost["Tot"], tmp_cost["Tot"])
+        print("Cost before this optimization iteration: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost["Tot"]))
         if thresh_type == "rel":
             if np.abs((tmp_cost["Tot"]-best_cost["Tot"])/best_cost["Tot"]) < ftol:
                 converged = True

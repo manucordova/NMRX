@@ -111,7 +111,6 @@ def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=N
     """
 
     pos = xyz.get_positions()
-    nr = xyz.get_number_of_atoms()
     typ = xyz.get_chemical_symbols()
     elements = []
     ntyp = 0
