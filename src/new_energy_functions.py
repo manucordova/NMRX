@@ -337,7 +337,7 @@ def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.,
     n_mol = int(len(symbs)/n_atoms)
     
     min_ds = []
-    # For each pair of atoms that should be close
+    # For each pair of atoms set
     for p in pairs:
         ds = []
         # Get all possible distances (intra- and intermolecular)

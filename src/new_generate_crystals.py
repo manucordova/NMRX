@@ -142,7 +142,47 @@ def check_clash(structure, n_atoms, pbc=True, clash_type="intra", factor=0.85):
 
 
 
-def generate_conformer(starting_structure, n_atoms, n_conf, conf_params, verbose=False):
+def constraint_violations(struct, n_atoms, pairs, thresh=5., contact=True, pbc=False):
+    """
+    Check a structure for distance constraint violation
+    
+    Inputs: - struct    Input structure
+            - n_atoms   Number of atoms in a single molecule
+            - pairs     Pairs of atoms to check for constraint violation
+            - thresh    Distance threshold for contact
+            - contact   Whether a violation should be identified for larger (True) or smaller (False) distance
+                            than the threshold. Can be a single boolean or an array of booleans or indices.
+            - pbc       Whether periodic boundary conditions should be taken into account
+    
+    Output: - n         Number of violated constraints
+    """
+    
+    # Initialize the number of violated constraints
+    n = 0
+    
+    # Get number of molecules in the unit cell
+    symbs = struct.get_chemical_symbols()
+    n_mol = int(len(symbs)/n_atoms)
+    
+    for p in pairs:
+        if not pbc:
+            d = struct.get_distance(p[0], p[1], mic=False)
+            if type(contact) == bool:
+                if contact:
+                    if d > thresh:
+                        n += 1
+                elif d < thresh:
+                    n += 1
+            else:
+                print("Array of contact booleans not implemented yet.")
+        else:
+            print("Constraint violations with pbc not implemented yet.")
+    
+    return n
+
+
+
+def generate_conformer(starting_structure, n_atoms, n_conf, conf_params, constraints=None, verbose=False):
     """
     Generate a conformaer
     
@@ -150,6 +190,7 @@ def generate_conformer(starting_structure, n_atoms, n_conf, conf_params, verbose
                 - n_atoms               Number of atoms in the molecule
                 - n_conf                Number of dihedral angles to vary
                 - conf_params           Atoms and masks of the dihedral angles
+                - constraints           Dictionary of constraint parameters for conformer selection
                 - verbose               Verbosity level
     
     Outputs:    - conf_angles           Array of conformational angles
@@ -179,6 +220,12 @@ def generate_conformer(starting_structure, n_atoms, n_conf, conf_params, verbose
             xyz.set_dihedral(a1=conf_params["a1"][i], a2=conf_params["a2"][i], a3=conf_params["a3"][i], a4=conf_params["a4"][i], angle=conf_angles[i], mask=mask)
         # Check clashes for the conformer (single molecule)
         clash = check_clash(xyz, n_atoms, pbc=False, clash_type="intra", factor=0.85)
+        
+        if constraints is not None:
+            n_viol = constraint_violations(xyz, n_atoms, constraints["pairs"], constraints["thresh"], constraints["contact"], pbc=False)
+            if n_viol > constraints["n_tol"]:
+                print("  The generated conformer violated set distance constraints! {}/{}".format(n_viol, constraints["n_tol"]))
+                clash = True
     
     if verbose:
         stop = time.time()
@@ -516,7 +563,7 @@ def create_crystal(starting_structure, lat, trans, R, conf_angles, sg, n_atoms, 
 
 
 
-def generate_crystal(starting_structure, n_atoms, n_mol, sg, parameter_set, cell_params_lims, n_conf=0, conf_params=None, smart_cell=True, max_V_factor=None, verbose=False):
+def generate_crystal(starting_structure, n_atoms, n_mol, sg, parameter_set, cell_params_lims, n_conf=0, conf_params=None, smart_cell=True, max_V_factor=None, constraints=None, verbose=False):
     """
     Generate an initial crystal structure
     
@@ -527,6 +574,7 @@ def generate_crystal(starting_structure, n_atoms, n_mol, sg, parameter_set, cell
                 - sg                    Space group of the crystal
                 - n_conf                Number of dihedral angles to vary
                 - conf_params           Atoms and masks of the dihedral angles
+                - constraints           Dictionary of constraint parameters for conformer selection
                 - verbose               Verbosity level
     
     Outputs:    - TODO
@@ -542,7 +590,7 @@ def generate_crystal(starting_structure, n_atoms, n_mol, sg, parameter_set, cell
     if "conf" in parameter_set:
         if n_conf == 0 or not conf_params:
             raise ValueError("No dihedral angle set.")
-        conf_angles = generate_conformer(starting_structure, n_atoms, n_conf, conf_params, verbose=verbose)
+        conf_angles = generate_conformer(starting_structure, n_atoms, n_conf, conf_params, constraints=constraints, verbose=verbose)
     else:
         conf_angles = []
     
