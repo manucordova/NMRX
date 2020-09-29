@@ -14,7 +14,6 @@ import ase
 import ase.io
 import subprocess as sp
 import shutil
-import dftbplus as dftb
 
 
 def which(pgm):
