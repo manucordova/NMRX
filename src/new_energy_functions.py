@@ -92,7 +92,7 @@ def compute_s_values(k_points):
 
 
 
-def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=None, comp_type="sp", driver="SD", relax_elems="all", SCC=True, DFTB3=False):
+def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=None, comp_type="sp", driver="SD", relax_elems="all", max_steps=10000, SCC=True, DFTB3=False):
     """
     Generate DFTB+ input file
     
@@ -226,7 +226,7 @@ def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=N
             pp += " LBFGS{\n"
         else:
             raise ValueError("Unknown driver!")
-        pp += "  MaxSteps = 500000\n"
+        pp += "  MaxSteps = {}\n".format(max_steps)
         pp += "  OutputPrefix = relax\n"
         
         if isinstance(relax_elems, str):
@@ -311,6 +311,49 @@ def dftbplus_energy(directory, struct, dftb_path, dispersion="D3H5"):
         return 0
 
     return E[0]
+
+
+
+def dftb_relax(directory, struct, dftb_path, n_opt, elems=["H"], dispersion="D3H5"):
+    """
+    DFTB+ relaxation
+
+    Inputs:     - directory     Root directory for the creation of the input and output files
+                - struct        Crystal to relax
+                - dftb_path     Path for the DFTB program
+                - dispersion    Type of dispersion correction to use
+
+    Outputs:    - out_struct    Relaxed structure
+    """
+
+    # Create temporary directory to store the DFTB files
+    number = str(np.random.random())
+    if not os.path.exists(directory+number+"tmp/"):
+        os.mkdir(directory+number+"tmp/")
+    initdir = os.getcwd()
+    outdir = os.path.abspath(directory+number+"tmp/")
+    skfdir = os.path.abspath("../src/dftb_sk_files/") + "/"
+
+    k_points_factor = 0.05  # Length for k-point sampling in reciprocal space (A^-1)
+
+    # Generate DFTB input file
+    make_dftb_input(struct, True, skfdir, outdir, dispersion, k_points_factor=k_points_factor, comp_type="relax", driver="gDIIS", relax_elems=elems, max_steps=n_opt, SCC=True, DFTB3=True)
+
+    # Move to the input file directory
+    os.chdir(outdir)
+
+    # Run DFTB and get output
+    output = sp.run([dftb_path], capture_output=True)
+    
+    # Get relaxed crystal
+    out_struct = ase.io.read(outdir + "/relax.gen")
+    
+    # Come back to the initial directory
+    os.chdir(initdir)
+    # Remove the temporary directory
+    shutil.rmtree(outdir)
+    
+    return out_struct
 
 
 
