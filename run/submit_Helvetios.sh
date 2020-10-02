@@ -21,9 +21,9 @@ f=$1
 f=${f#run_}
 f=${f%.py}
 
-d=`grep "out_dir" $f`
+d=`grep "out_dir" $1`
 
-dir="$(cut -d'\"' -f2 <<<'$d')"
+dir="$(cut -d'"' -f2 <<< $d )"
 
 echo $dir
 
