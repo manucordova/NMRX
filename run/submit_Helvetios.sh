@@ -21,6 +21,17 @@ f=$1
 f=${f#run_}
 f=${f%.py}
 
+d=`grep "out_dir" $f`
+
+dir="$(cut -d'\"' -f2 <<<'$d')"
+
+echo $dir
+
+if [ ! -d "$dir" ] ;
+then
+  mkdir $dir
+fi
+
 k=$2
 
 for i in `seq 1 36`
