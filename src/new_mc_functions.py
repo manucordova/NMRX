@@ -367,9 +367,11 @@ def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, 
         k += 3
     # Rotation
     if "rot" in parameter_set:
-        opt_R = cr.rotation_matrix(res.x[k:k+4])
-        opt_R = opt_R.dot(R)
-        k += 4
+        opt_Rx = cr.rotation_matrix([1., 0., 0., res.x[k]])
+        opt_Ry = cr.rotation_matrix([0., 1., 0., res.x[k+1]])
+        opt_Rz = cr.rotation_matrix([0., 0., 1., res.x[k+2]])
+        opt_R = opt_Rx.dot(opt_Ry.dot(opt_Rz.dot(R)))
+        k += 3
     # Conformation
     if "conf" in parameter_set:
         opt_conf = res.x[k:]
