@@ -262,11 +262,14 @@ def to_minimize(x, struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_se
         k += 3
     # Rotation
     if "rot" in parameter_set:
-        r = np.array(x[k:k+4])
-        r[:3] /= np.linalg.norm(r[:3])
-        new_R = cr.rotation_matrix(x[k:k+4])
-        new_R = new_R.dot(R)
-        k += 4
+        rx = x[k]
+        ry = x[k+1]
+        rz = x[k+2]
+        Rx = cr.rotation_matrix([1., 0., 0., rx])
+        Ry = cr.rotation_matrix([0., 1., 0., ry])
+        Rz = cr.rotation_matrix([0., 0., 1., rz])
+        new_R = Rx.dot(Ry.dot(Rz.dot(R)))
+        k += 3
     # Conformation
     if "conf" in parameter_set:
         new_conf = x[k:]
@@ -335,10 +338,8 @@ def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, 
         bounds.extend([(0., 1.), (0., 1.), (0., 1.)])
     # Rotation
     if "rot" in parameter_set:
-        tmp = cr.generate_random_unit_vector()
-        x0.extend(tmp)
-        x0.append(5.)
-        bounds.extend([(-1., 1.), (-1., 1.), (-1., 1.), (-180., 180.)])
+        x0.extend([0., 0., 0.])
+        bounds.extend([(-180., 180.), (-180., 180.), (-180., 180.)])
     # Conformation
     if "conf" in parameter_set:
         x0.extend(list(conf_angles))
