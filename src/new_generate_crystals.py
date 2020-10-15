@@ -73,10 +73,19 @@ def distance(x0, x1, abc, pbc=False):
     Outputs:    - d     Distances between x0 and each point in x1
     """
     
-    delta = np.abs(x0-x1)
+    delta = x0-x1
     if pbc:
+        # Loop over all PBC vectors
         for a in abc:
-            delta = np.where(delta > 0.5*a, delta-a, delta)
+            # Get the norm of the PBC vector
+            norm = np.linalg.norm(a)
+            
+            for i in range(len(delta)):
+                x = delta[i].T.dot(a)/norm
+                if x > 0.5:
+                    delta[i] -= a
+                elif x < -0.5:
+                    delta[i] += a
     
     return np.sqrt((delta**2).sum(axis=-1))
 
@@ -619,13 +628,23 @@ def generate_crystal(starting_structure, n_atoms, n_mol, sg, parameter_set, cell
         
         # Get cell from initial structure
         lat = starting_structure.get_cell_lengths_and_angles()
-        # Generate new angles if they should be varied
-        if "alpha" in parameter_set:
-            lat[3] = cell_params_lims[2] + (cell_params_lims[3] - cell_params_lims[2]) * np.random.random()
-        if "beta" in parameter_set:
-            lat[4] = cell_params_lims[2] + (cell_params_lims[3] - cell_params_lims[2]) * np.random.random()
-        if "gamma" in parameter_set:
-            lat[5] = cell_params_lims[2] + (cell_params_lims[3] - cell_params_lims[2]) * np.random.random()
+        
+        # Generate new angles if they should be varied, generate new angles until the cell can be constructed without issue
+        crash = True
+        while crash:
+            if "alpha" in parameter_set:
+                lat[3] = cell_params_lims[2] + (cell_params_lims[3] - cell_params_lims[2]) * np.random.random()
+            if "beta" in parameter_set:
+                lat[4] = cell_params_lims[2] + (cell_params_lims[3] - cell_params_lims[2]) * np.random.random()
+            if "gamma" in parameter_set:
+                lat[5] = cell_params_lims[2] + (cell_params_lims[3] - cell_params_lims[2]) * np.random.random()
+            
+            try:
+                tmp = ase.Atoms()
+                tmp.set_cell(lat)
+                crash = False
+            except:
+                pass
         
         # Generate cell lengths
         if smart_cell:
