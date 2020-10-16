@@ -16,6 +16,28 @@ import time
 
 
 
+def check_valid_angles(alpha, beta, gamma):
+    """
+    Check if the three angles for the construction of the unit cell are valid
+    
+    Inputs:     - alpha     First cell angle (in degrees)
+                - beta      Second cell angle (in degrees)
+                - gamma     Third cell angle (in degrees)
+    
+    Output:     - valid     Whether the angles are valid or not
+    """
+    
+    al = np.deg2rad(alpha)
+    be = np.deg2rad(beta)
+    ga = np.deg2rad(gamma)
+    
+    cx2 = np.square(np.cos(be))
+    cy2 = np.square((np.cos(beta)*np.cos(gamma))/np.sin(gamma))
+    
+    return 1 - cx2 - cy2 >= 0.
+
+
+
 def molecular_volume(symbs, n_mol):
     """
     Obtain the volume taken by all atoms in the molecule (sum of VDW spheres)
@@ -536,6 +558,10 @@ def create_crystal(starting_structure, lat, trans, R, conf_angles, sg, n_atoms, 
     # Copy crystal structure to modify it
     trial_structure = copy.deepcopy(starting_structure)
     
+    # If the angles are not valid
+    if not check_valid_angles(lat[3], lat[4], lat[5]):
+        return None, True
+    
     # Set conformation
     for i, a in enumerate(conf_angles):
         # Set mask for the conformational change
@@ -630,8 +656,8 @@ def generate_crystal(starting_structure, n_atoms, n_mol, sg, parameter_set, cell
         lat = starting_structure.get_cell_lengths_and_angles()
         
         # Generate new angles if they should be varied, generate new angles until the cell can be constructed without issue
-        crash = True
-        while crash:
+        valid_angles = False
+        while not valid_angles:
             if "alpha" in parameter_set:
                 lat[3] = cell_params_lims[2] + (cell_params_lims[3] - cell_params_lims[2]) * np.random.random()
             if "beta" in parameter_set:
@@ -639,12 +665,8 @@ def generate_crystal(starting_structure, n_atoms, n_mol, sg, parameter_set, cell
             if "gamma" in parameter_set:
                 lat[5] = cell_params_lims[2] + (cell_params_lims[3] - cell_params_lims[2]) * np.random.random()
             
-            try:
-                tmp = ase.Atoms()
-                tmp.set_cell(lat)
-                crash = False
-            except:
-                pass
+            # Check that the angles generated are valid
+            valid_angles = check_valid_angles(lat[3], lat[4], lat[5])
         
         # Generate cell lengths
         if smart_cell:

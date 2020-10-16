@@ -142,12 +142,16 @@ def randomize(param_to_change, lat, trans, R, conf_angles, step_list, A=1.):
     if param_to_change == "c":
         new_lat[2] = lat[2] + (1 - (2 * np.random.random())) * step_list[0] * A
     
-    if param_to_change == "alpha":
-        new_lat[3] = lat[3] + (1 - (2 * np.random.random())) * step_list[1] * A
-    if param_to_change == "beta":
-        new_lat[4] = lat[4] + (1 - (2 * np.random.random())) * step_list[1] * A
-    if param_to_change == "gamma":
-        new_lat[5] = lat[5] + (1 - (2 * np.random.random())) * step_list[1] * A
+    valid_angles = False
+    while not valid_angles:
+        if param_to_change == "alpha":
+            new_lat[3] = lat[3] + (1 - (2 * np.random.random())) * step_list[1] * A
+        if param_to_change == "beta":
+            new_lat[4] = lat[4] + (1 - (2 * np.random.random())) * step_list[1] * A
+        if param_to_change == "gamma":
+            new_lat[5] = lat[5] + (1 - (2 * np.random.random())) * step_list[1] * A
+        
+        valid_angles = cr.check_valid_angles(new_lat[3], new_lat[4], new_lat[5])
     
     if param_to_change == "trans":
         v = generate_random_unit_vector()
