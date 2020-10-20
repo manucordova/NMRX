@@ -32,9 +32,9 @@ def check_valid_angles(alpha, beta, gamma):
     ga = np.deg2rad(gamma)
     
     cx2 = np.square(np.cos(be))
-    cy2 = np.square((np.cos(beta)*np.cos(gamma))/np.sin(gamma))
+    cy2 = np.square((np.cos(al) - np.cos(be)*np.cos(ga))/np.sin(ga))
     
-    return 1 - cx2 - cy2 >= 0.
+    return 1 - cx2 - cy2 > 0.
 
 
 
@@ -821,6 +821,35 @@ def optimize_rot_rmsd(pos, ref_pos, align=None):
 
 
 
+def get_opt_rot(pos, ref_pos):
+    """
+    Get the rotation matrix that minimizes the RMSD between two sets of atomic positions. Makes use of the Kabsch algorithm.
+
+    Inputs: - pos       Atomic positions to align
+            - ref_pos   Reference atomic positions
+            
+    Output: - R         Rotation matrix
+    """
+
+    # Construct the P and Q matrices
+    P = pos
+    Q = ref_pos
+
+    # Get covariance matrix, and perform SVD decomposition
+    H = P.T.dot(Q)
+    U, S, V = np.linalg.svd(H)
+
+    # Get rotation matrix
+    d = np.linalg.det(V.T.dot(U.T))
+    d /= np.abs(d)
+    I = np.eye(3)
+    I[2,2] = d
+    R = V.T.dot(I.dot(U.T))
+
+    return R
+
+
+
 def pos_rmsd(struct, ref, inds, align=None):
     """
     Obtain the positional RMSD between a structure and a reference.
@@ -838,21 +867,41 @@ def pos_rmsd(struct, ref, inds, align=None):
     pos = struct.get_positions()[inds]
     ref_pos = ref.get_positions()[inds]
     
+    
     # If alignment should be performed on a subset of the atoms only
     if align is not None:
-        # Get the indices of inds corresponding to the atoms to align
-        inds_align = [inds.index(i) for i in align]
+        # Get the atomic positions to align
+        tmp_pos = struct.get_positions()[align]
+        tmp_ref_pos = ref.get_positions()[align]
         
         # Center the atoms to align around the origin (center of mass)
         c = struct[align].get_center_of_mass()
         c_ref = ref[align].get_center_of_mass()
-        c_pos = pos - c
-        c_pos_ref = ref_pos - c_ref
         
-        # Optimize rotation and get the RMSD
-        rmsd, rot_pos = optimize_rot_rmsd(c_pos, c_pos_ref, align=inds_align)
     else:
-        rmsd, rot_pos = optimize_rot_rmsd(c_pos, c_pos_ref, align=None)
+        # Get the atomic positions to align
+        tmp_pos = struct.get_positions()[inds]
+        tmp_ref_pos = ref.get_positions()[inds]
+    
+        # Center the atoms to align around the origin (center of mass)
+        c = struct[inds].get_center_of_mass()
+        c_ref = ref[inds].get_center_of_mass()
+
+    c_pos = pos - c
+    c_pos_ref = ref_pos - c_ref
+    c_tmp_pos = tmp_pos - c
+    c_tmp_pos_ref = tmp_ref_pos - c_ref
+    
+    R = get_opt_rot(c_tmp_pos, c_tmp_pos_ref)
+
+    
+    # Optimize rotation and get the RMSD
+    rot_pos = []
+    for p in c_pos:
+        rot_pos.append(R.dot(p))
+    rot_pos = np.array(rot_pos)
+    
+    rmsd = np.sqrt(np.mean(np.square(np.linalg.norm(rot_pos-c_pos_ref, axis=1))))
     
     # Match the atomic positions of the input structure to the reference
     al_pos = rot_pos + c_ref
@@ -942,7 +991,7 @@ def opt_conf(struct, ref, a1, a2, a3, a4, inds_mask, ha_inds, thresh):
             
         # Reduce the step size
         step /= 2.
-    
+        
     return a
 
 
