@@ -418,16 +418,16 @@ def optimize_lat_param(struct, p, best_cost, bounds, lat, trans, R, conf_angles,
     best_lat = copy.deepcopy(lat)
     lat_ind = {"a":0, "b":1, "c":2, "alpha":3, "beta":4, "gamma":5}
     
+    # If the step size is too small, return the original lattice parameter
+    if step < xtol:
+        return best_lat, best_cost
+        
     if verbose:
         print("  Optimizing parameter {}. Initial value {}, step size {}".format(p, lat[lat_ind[p]], step))
     
     # Display warning if the initial parameters are outside the bounds
     if lat[lat_ind[p]] > bounds[1] or lat[lat_ind[p]] < bounds[0]:
         print("  WARNING: the initial parameters are outside the bounds")
-    
-    # If the step size is too small, return the original lattice parameter
-    if step < xtol:
-        return best_lat, best_cost
 
     # Obtain step size
     span = bounds[1]-bounds[0]
@@ -583,15 +583,15 @@ def optimize_trans(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_
                 - best_cost             Optimized cost function
     """
     
-    if verbose:
-        print("  Optimizing translation, step size {}".format(step))
-        print("  Initial translation vector: {:.4f}, {:.4f}, {:.4f}".format(trans[0], trans[1], trans[2]))
-    
     best_trans = copy.deepcopy(trans)
     
     # If the step size is too small, return the original lattice parameter
     if step < xtol:
         return best_trans, best_cost
+        
+    if verbose:
+        print("  Optimizing translation, step size {}".format(step))
+        print("  Initial translation vector: {:.4f}, {:.4f}, {:.4f}".format(trans[0], trans[1], trans[2]))
 
     # Obtain step size
     span = bounds[1]-bounds[0]
@@ -773,47 +773,100 @@ def optimize_rot(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_at
                 - best_cost             Optimized cost function
     """
     
-    if verbose:
-        print("  Optimizing rotation. Step size: {}".format(step))
+    axes = ["x", "y", "z"]
     
     best_R = copy.deepcopy(R)
     converged = False
-    N = 0
     
     if step < xtol:
         return best_R, best_cost
+        
+    if verbose:
+        print("  Optimizing rotation. Step size: {}".format(step))
     
     # Generate initial rotation
     while not converged:
-        N += 1
-        # Generate random rotation
-        r = cr.generate_random_unit_vector()
-        r = np.append(r, step*bounds[1])
-        opt_R = cr.rotation_matrix(r)
-        opt_R = opt_R.dot(best_R)
+        converged = True
         
-        # Get associated cost function
-        opt_cryst, clash = cr.create_crystal(struct, lat, trans, opt_R, conf_angles, sg, n_atoms, conf_params=conf_params)
-        if clash:
-            opt_cost = {}
-            opt_cost["Tot"] = 1e12
-        else:
-            opt_cost = compute_cost(opt_cryst, cost_function, cost_factors, cost_options)
+        # Loop over the three axes
+        for i in range(3):
         
+            old_R = copy.deepcopy(best_R)
         
-        # If the energy decreases, update the rotation matrix
-        if opt_cost["Tot"] < best_cost["Tot"]:
-            if verbose:
-                print("  Decrease in the cost function found after {} tries ({:.2f} -> {:.2f})".format(N, best_cost["Tot"], opt_cost["Tot"]))
-            best_cost = copy.deepcopy(opt_cost)
-            best_R = copy.deepcopy(opt_R)
-            N = 0
-        
-        # After N_max iterations without decrease of the cost function, reduce the step size
-        if N > N_max:
-            return optimize_rot(struct, best_cost, bounds, lat, trans, best_R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose, N_max=N_max)
+            # Generate the initial rotations (positive and negative angles)
+            r_p = np.array([0., 0., 0., bounds[1]])*step
+            r_m = np.copy(r_p)
+            r_m[-1] *= -1
+            
+            # Set the axis of rotation
+            r_p[i] = 1.
+            r_m[i] = 1.
+            
+            # Generate the rotation matrices
+            R_p = cr.rotation_matrix(r_p).dot(old_R)
+            R_m = cr.rotation_matrix(r_m).dot(old_R)
+            
+            # Get the cost associated with the positive and negative steps
+            cryst_p, clash_p = cr.create_crystal(struct, lat, trans, R_p, conf_angles, sg, n_atoms, conf_params=conf_params)
+            if clash_p:
+                tmp_cost_p["Tot"] = 1e12
+            else:
+                tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
+                
+            cryst_m, clash_m = cr.create_crystal(struct, lat, trans, R_m, conf_angles, sg, n_atoms, conf_params=conf_params)
+            if clash_m:
+                tmp_cost_m["Tot"] = 1e12
+            else:
+                tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
+            
+            # If positive direction is found, increase the parameter until energy rises
+            if tmp_cost_p["Tot"] < best_cost["Tot"] and tmp_cost_p["Tot"] < tmp_cost_m["Tot"]:
+                converged = False
+                if verbose:
+                    print("  Increasing the rotation angle along {} decreases the cost".format(axes[i]))
+                # While the energy decreases
+                while tmp_cost_p["Tot"] < best_cost["Tot"]:
+                    # Update the best parameter and associated cost
+                    best_cost = copy.copy(tmp_cost_p)
+                    best_R = copy.copy(R_p)
+                    # Generate a new parameter
+                    r_p[-1] += step*bounds[1]
+                    R_p = cr.rotation_matrix(r_p).dot(old_R)
+                    # Generate the corresponding crystal
+                    cryst_p, clash_p = cr.create_crystal(struct, lat, trans, R_p, conf_angles, sg, n_atoms, conf_params=conf_params)
+                    # Compute cost
+                    if clash_p:
+                        tmp_cost_p["Tot"] = 1e12
+                    else:
+                        tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
+                    if verbose:
+                        print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_p["Tot"]))
+                        
+            # If negative direction is found, decrease the parameter until energy rises
+            elif tmp_cost_m["Tot"] < best_cost["Tot"] and tmp_cost_m["Tot"] < tmp_cost_p["Tot"]:
+                converged = False
+                if verbose:
+                    print("  Decreasing the rotation angle along {} decreases the cost".format(axes[i]))
+                # While the energy decreases
+                while tmp_cost_m["Tot"] < best_cost["Tot"]:
+                    # Update the best parameter and associated cost
+                    best_cost = copy.copy(tmp_cost_m)
+                    best_R = copy.copy(R_m)
+                    # Generate a new parameter
+                    r_m[-1] -= step*bounds[1]
+                    R_m = cr.rotation_matrix(r_m).dot(old_R)
+                    # Generate the corresponding crystal
+                    cryst_m, clash_m = cr.create_crystal(struct, lat, trans, R_m, conf_angles, sg, n_atoms, conf_params=conf_params)
+                    # Compute cost
+                    if clash_p:
+                        tmp_cost_m["Tot"] = 1e12
+                    else:
+                        tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
+                    if verbose:
+                        print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_m["Tot"]))
+            
     
-    return opt_R, opt_cost
+    return optimize_rot(struct, best_cost, bounds, lat, trans, best_R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose, N_max=N_max)
 
 
 
@@ -847,12 +900,12 @@ def optimize_conf(struct, i, best_cost, bounds, lat, trans, R, conf_angles, sg, 
 
     best_conf = copy.deepcopy(conf_angles)
 
-    if verbose:
-        print("  Optimizing conformer angle {}/{}. Initial value {}, step size {}".format(i+1, len(conf_angles), conf_angles[i], step))
-
     # If the step size is too small, return the original conformer angle
     if step < xtol:
         return best_conf, best_cost
+
+    if verbose:
+        print("  Optimizing conformer angle {}/{}. Initial value {}, step size {}".format(i+1, len(conf_angles), conf_angles[i], step))
 
     # Obtain step size
     span = bounds[1]-bounds[0]
@@ -943,15 +996,9 @@ def optimize_conf(struct, i, best_cost, bounds, lat, trans, R, conf_angles, sg, 
     else:
         raise ValueError("Error during the optimization of conformer angle {}".format(i+1))
         return
-
-
-
-
-
-
-
-
-
+        
+        
+        
 def iterative_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, cell_params_lims, conf_params=None, n_max=100, verbose=False, step=1e-2, ftol=1., xtol=1e-4, thresh_type="abs"):
     """
     Optimize the cost function with respect to all variable parameters.
@@ -987,6 +1034,9 @@ def iterative_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set
     init_cryst, _ = cr.create_crystal(struct, lat, trans, R, conf_angles, sg, n_atoms, conf_params=conf_params)
     # Get initial cost
     best_cost = compute_cost(init_cryst, cost_function, cost_factors, cost_options)
+    
+    print(best_cost)
+    
     converged = False
     
     opt_lat = copy.deepcopy(lat)
@@ -1013,9 +1063,9 @@ def iterative_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set
             bounds = [0., 1.]
             opt_trans, tmp_cost = optimize_trans(struct, tmp_cost, bounds, opt_lat, opt_trans, opt_R, opt_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step, ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
         
-        # TODO: optimize rotation
+        # Optimize rotation
         if "rot" in parameter_set:
-            bounds = [0., 100.]
+            bounds = [0., 180.]
             opt_R, tmp_cost = optimize_rot(struct, tmp_cost, bounds, opt_lat, opt_trans, opt_R, opt_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step, ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
         
         # TODO: optimize conformation
