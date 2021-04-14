@@ -183,6 +183,54 @@ def randomize(param_to_change, lat, trans, R, conf_angles, step_list, A=1.):
             new_conf[i] -= 360.
     
     return new_lat, new_trans, new_R, new_conf
+    
+    
+    
+def normalize_amplitude(Amp, param_to_change, step_size, max_step_size, verbose=False):
+    """
+    Restrict the amplitude of a parameter change to comply with the maximum step size set.
+    
+    Inputs: - Amp               Directory of amplitudes
+            - param_to_change   Parameter to normalize the amplitude for
+            - step_size         Initial step size
+            - max_step_size     Maximum step size
+            - verbose           Verbosity level
+            
+    Output: - Amp               Updated directory of amplitudes
+    """
+
+    old_amp = Amp[param_to_change]
+    change = False
+    
+    if param_to_change in ["a", "b", "c"]:
+        while Amp[param_to_change] * step_size[0] > max_step_size[0]:
+            Amp[param_to_change] /= 2
+            change = True
+        
+    elif param_to_change in ["alpha", "beta", "gamma"]:
+        while Amp[param_to_change] * step_size[1] > max_step_size[1]:
+            Amp[param_to_change] /= 2
+            change = True
+    
+    elif param_to_change == "trans":
+        while Amp[param_to_change] * step_size[2] > max_step_size[2]:
+            Amp[param_to_change] /= 2
+            change = True
+    
+    elif param_to_change == "rot":
+        while Amp[param_to_change] * step_size[3] > max_step_size[3]:
+            Amp[param_to_change] /= 2
+            change = True
+    
+    elif param_to_change == "conf":
+        while Amp[param_to_change] * step_size[4] > max_step_size[4]:
+            Amp[param_to_change] /= 2
+            change = True
+    
+    if verbose and change:
+        print("  Amplitude decreased from {} to {}".format(old_amp, Amp[param_to_change]))
+    
+    return Amp
 
 
 

@@ -92,7 +92,7 @@ def compute_s_values(k_points):
 
 
 
-def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=None, comp_type="sp", driver="SD", relax_elems="all", max_steps=10000, SCC=True, DFTB3=False):
+def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=None, comp_type="sp", driver="SD", relax_elems="all", max_steps=10000, SCC=True, DFTB3=False, showForces=False):
     """
     Generate DFTB+ input file
     
@@ -252,6 +252,11 @@ def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=N
         pp += " }\n"
 
         pp += "}\n"
+    
+    if showForces:
+        pp += "Analysis {\n"
+        pp += " CalculateForces = Yes\n"
+        pp += "}\n"
         
     if not os.path.exists(outdir):
         os.mkdir(outdir)
@@ -311,6 +316,78 @@ def dftbplus_energy(directory, struct, dftb_path, dispersion="D3H5"):
         return 0
 
     return E[0]
+
+
+
+def dftbplus_forces(directory, struct, dftb_path, dispersion="D3H5"):
+    """
+    DFTB+ single-point energy and forces computation
+
+    Inputs:     - directory     F
+                - struct
+                - dftb_path     Path for the DFTB program
+                - dispersion    Type of dispersion correction to use
+
+    Outputs:    - E     F
+    Options:    struct = ase.Atoms object. Crystal structure to compute the energy for
+                fileformat = "cif", "xyz", ... (any format valid for ASE)
+                dispersion = "D3", "LJ", "None"
+    """
+    
+    # Initialize array of forces
+    forces = np.zeros((len(struct), 3))
+    # Initialize stress tensor
+    stress = np.zeros((3,3))
+
+    # Create temporary directory to store the DFTB files
+    number = str(np.random.random())
+    if not os.path.exists(directory+number+"tmp/"):
+        os.mkdir(directory+number+"tmp/")
+    initdir = os.getcwd()
+    outdir = os.path.abspath(directory+number+"tmp/")
+    skfdir = os.path.abspath("../src/dftb_sk_files/") + "/"
+
+    k_points_factor = 0.05  # Length for k-point sampling in reciprocal space (A^-1)
+
+    # Generate DFTB input file
+    make_dftb_input(struct, True, skfdir, outdir, dispersion, k_points_factor=k_points_factor, comp_type="sp", SCC=True, DFTB3=True, showForces=True)
+
+    # Move to the input file directory
+    os.chdir(outdir)
+
+    # Run DFTB and get output
+    output = sp.run([dftb_path], capture_output=True)
+    outputStr = output.stdout.decode("utf-8").split("\n")
+    
+    with open(outdir + "/detailed.out", "r") as F:
+        lines = F.read().split("\n")
+    
+    for i, l in enumerate(lines):
+        if "Total Forces" in l:
+            for j in range(len(struct)):
+                forces[j] = np.array([float(x) for x in lines[i+j+1].split()[1:]])
+        
+        if "Total stress tensor" in l:
+            for j in range(3):
+                stress[j] = np.array([float(x) for x in lines[i+j+1].split()])
+
+    # Come back to initial directory
+    os.chdir(initdir)
+    # Obtain energy
+    #output, error = process.communicate()
+    out = [s for s in outputStr if 'Total Energy' in s]
+    
+    
+    
+    # Remove the temporary directory
+    shutil.rmtree(outdir)
+    try:
+        E = [float(s) for s in out[0].split(" ") if s.replace(".", "", 1).replace("-", "", 1).isdigit()]
+    except:
+        print("Energy computation failed!")
+        return 0
+
+    return E[0], forces, stress
 
 
 
