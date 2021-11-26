@@ -197,7 +197,7 @@ def check_clash(structure, n_atoms, pbc=True, clash_type="intra", factor=0.85):
                     return True
 
     if clash_type == "inter":
-        D = get_distances(structure, range(n_atoms), range(n_atoms, len(structure)))
+        D = get_distances(structure, range(n_atoms), range(n_atoms, len(structure)), mic=pbc)
 
         for i in range(n_atoms):
             for j in np.where(D[i] < max_contact)[0]:
