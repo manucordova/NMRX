@@ -1,36 +1,41 @@
-##
-##
+###################################################################################################
+#####                                                                                         #####
+#####                           Functions to run ShiftML predictions                          #####
+#####                     Author: Manuel Cordova (manuel.cordova@epfl.ch)                     #####
+#####                                Last modified: 23.03.2022                                #####
+#####                                                                                         #####
+###################################################################################################
 
-import autograd
+# Import libraries
 import numpy as np
-import copy
-import ase
-from ase.io import read,write
-from ase.visualize import view
-import sys,os
-from glob import glob
-from copy import copy
-from tqdm import tqdm_notebook
-import cPickle as pck
+import os
+import sys
+import json
+import itertools as it
 
-import scipy.optimize as op
-
-cluster = False
-if cluster:
-    root = "/home"
-else:
-    root = "/Users"
-
+# Import ShiftML libraries
 sys.path.insert(0, os.path.abspath("../src"))
 from sML.krr_modules import *
 from ml_tools.utils import get_mae,get_rmse,get_sup,get_spearman,get_score
-import json
 
+# Available nuclei for ShiftML
+symb2z = {"H":1, "C":6, "N":7, "O":8}
 
 
 def load_kernel(sp=1):
+    """
+    Load ShiftML kernel
+
+    Inputs:     - sp                Species (atomic number of nucleus to load)
+
+    Outputs:    - krrs              [?]
+                - representation    SOAP representation
+                - trainsoaps        Training environments
+                - model_numbers     [?]
+                - zeta              Power of the kernel
+    """
     # Loading the models
-    print "Loading the model for : ", sp
+    print("Loading the model for : {}".format(sp))
 
     kernelDir = os.path.abspath("../src/ShiftML_kernels/") + "/"
 
@@ -38,7 +43,7 @@ def load_kernel(sp=1):
         model_numbers = json.load(f)
     # Load up FPS selection
     trainsoaps = np.load(kernelDir + 'sparse_{}_20000_soap_vectors.npy'.format(sp))[:20000]
-    krrs = np.load(kernelDir + 'sparse_{}_20000_model.npy'.format(sp), allow_pickle=True)
+    krrs = np.load(kernelDir + 'sparse_{}_20000_model.npy'.format(sp), allow_pickle=True, encoding="latin1")
     zeta = model_numbers['hypers']['zeta']
     global_species = [1, 6, 7, 8, 16]
     nocenters = copy(global_species)
@@ -46,206 +51,130 @@ def load_kernel(sp=1):
     soap_params = model_numbers['soaps']
     representation = RawSoapQUIP(**soap_params)
 
-    print "The model is ready"
+    print("The model is ready")
 
     return krrs, representation, trainsoaps, model_numbers, zeta
 
 
+
 def predict_shifts(frames_test, krrs, representation, trainsoaps, model_numbers, zeta, sp=1):
-    # Loading test properties
+    """
+    Run shift predictions
+
+    Inputs:     - frames_test       Structures to predict shifts for
+                - krrs              [?]
+                - representation    SOAP representation
+                - transoaps         Training environments
+                - model_numbers     [?]
+                - zeta              Power of the kernel
+                - sp                Species to predict the shifts for
+
+    Outputs:    - y_best            Predicted shifts
+                - y_err             Prediction uncertainties
+    """
+
+    ### This function was changed with a temporary fix (memory leak)
     rawsoaps = representation.transform(frames_test)
-    # print "Loaded SOAPS for {}".format(z2symb[sp])
+    ###
 
     x_test = rawsoaps[:, np.array(model_numbers['space'])]
+
     x_test /= np.linalg.norm(x_test, axis=1)[:, np.newaxis]
     Ktest = np.dot(x_test, trainsoaps.T) ** zeta
 
-    y_pred = bootstrap_krr_predict_PP(Ktest, krrs, model_numbers['alpha_bs'], model_numbers['indices_bs']) + \
-             model_numbers['y_offset']
+    y_pred = bootstrap_krr_predict_PP(Ktest, krrs, model_numbers['alpha_bs'], model_numbers['indices_bs']) + model_numbers['y_offset']
+
     y_best = y_pred.mean(axis=0)
-    # y_err  = y_pred.std(axis=0)
-    return y_best
+    y_err  = y_pred.std(axis=0)
 
-
-# here we average the methyls (and count them 1 time), the CH2 protons are assigned as best match in the individual groups
-def exp_rmsd(y_calc,molecule="cocaine"):
-
-
-    if molecule=="cocaine":
-        y_exp = [3.76, 3.78, 5.63,
-                 3.49, 3.06,
-                 3.32,
-                 2.91, 3.38,
-                 2.56, 2.12,
-                 8.01, 8.01, 8.01, 8.01, 8.01,
-                 3.78, 1.04]
-
-        # label_exp=[1,2,3,4,5,6,7,8,9,10,[11,12,13],14,15,16,17,18,[19,20,21]]
-        # label_calc=[1,2,3,4,[5,6],[7,8],[9,10],[11,12,13],[14,15,16,17,18],[19,20,21]]
-
-        y_calc = np.array(y_calc[0:len(y_calc) / 2])
-        # y_calc=np.array(y_calc[np.arange(0,len(y_calc),len(y_calc)/21)])
-
-        y_sort = []
-        for k1 in range(3):
-            y_sort.append(y_calc[k1])
-
-        y_sel = y_calc[3:5]
-        y_sort.append(np.min(y_sel))
-        y_sort.append(np.max(y_sel))
-
-        y_sort.append(y_calc[5])
-
-        y_sel = y_calc[6:8]
-        y_sort.append(np.max(y_sel))
-        y_sort.append(np.min(y_sel))
-
-        y_sel = y_calc[8:10]
-        y_sort.append(np.min(y_sel))
-        y_sort.append(np.max(y_sel))
-
-        for k1 in range(10, 15):
-            # y_sort.append(np.mean(y_calc[13:18]))
-            y_sort.append(y_calc[k1])
-
-        y_sel = y_calc[15:18]
-        for k1 in range(1):
-            y_sort.append(np.mean(y_sel))
-
-        y_sel = y_calc[18:21]
-        for k1 in range(1):
-            y_sort.append(np.mean(y_sel))
+    return y_best, y_err
 
 
 
-    if molecule == "azd":
-        y_exp = [6.92,
-                 8.69,
-                 9.01,
-                 8.47,
-                 15.37,
-                 7.73,
-                 9.64,
-                 2.90,
-                 1.78,
-                 1.88,
-                 1.88,
-                 1.8,
-                 1.6,
-                 0.44,
-                 1.54,
-                 1.88,
-                 1.88,
-                 0.8,
-                 0.8,
-                 1.0,
-                 1.74,
-                 1.74,
-                 0.73,
-                 0.73,
-                 0.73]
+def best_fit_given_params(exp, shields, equivs, ambiguous, a, b):
+    """
+    Best fit experimental and computed chemical shifts
 
-        y_calc = np.array(y_calc[0:len(y_calc) / 2])
+    Inputs:     - exp           Experimental shifts
+                - shields       Computed shieldings
+                - equivs        Equivalent nuclei
+                - ambiguous     Ambiguous nuclei
+                - a             Slope for the conversion from shielding to shift
+                - b             Offset for the conversion from shielding to shift
+    """
 
-        y_sort = []
-        for k1 in range(22):
-            y_sort.append(y_calc[k1])
-        y_sel = y_calc[22:25]
-        for k1 in range(1):
-            y_sort.append(np.mean(y_sel))
-        y_sel = y_calc[25:28]
-        for k1 in range(1):
-            y_sort.append(np.mean(y_sel))
-        y_sel = y_calc[28:31]
-        for k1 in range(1):
-            y_sort.append(np.mean(y_sel))
+    # Initialize arrays of computed shifts, shieldings, errors, and shift RMSE
+    comp_shifts = np.zeros(len(exp))
+    discarded = []
+    final_shields = np.zeros(len(exp))
+    shields_errs = np.zeros(len(exp))
+    rmse = np.inf
+    # For all shifts
+    for i, (shift, shield) in enumerate(zip(exp, shields)):
+        # If the shift is already written: do not overwrite it
+        if i not in discarded:
+            unique = True
+            # Managing equivalent nuclei
+            for equiv in equivs:
+                if i in equiv:
+                    unique = False
+                    # For all equivalent nuclei: consider the average shift
+                    for j in equiv:
+                        final_shields[j] = np.mean([shields[k] for k in equiv])
+                        shields_errs[j] = np.std([shields[k] for k in equiv])/np.sqrt(float(len(equiv)))
+                        discarded.append(j)
+            # For unique nuclei: append the shielding
+            if unique:
+                final_shields[i] = shield
+                shields_errs[i] = 0.
+                discarded.append(i)
 
-    if molecule == "ritonavir":
+    # Obtain temporary RMSE (without considering ambiguities yet)
+    best_rmse = np.sqrt(np.mean(np.square([exp[k] - a*final_shields[k] - b for k in range(len(exp))])))
 
-        # Only protons attached to carbons, ch2 groups averaged, aromatic groups averaged
-        ar_av = np.mean([y_calc[29], y_calc[30], y_calc[31], y_calc[32], y_calc[46],
-                         y_calc[0], y_calc[1], y_calc[2], y_calc[10], y_calc[25]])
-
-        y_sort = [np.mean([y_calc[7], y_calc[8], y_calc[9]]), y_calc[34], np.mean([y_calc[35], y_calc[36], y_calc[37]]),
-                  y_calc[33], np.mean([y_calc[40], y_calc[41], y_calc[42]]),
-                  np.mean([y_calc[38], y_calc[39]]), np.mean([y_calc[38], y_calc[39]]),
-                  y_calc[18], y_calc[14], np.mean([y_calc[15], y_calc[16], y_calc[17]]),
-                  np.mean([y_calc[11], y_calc[12], y_calc[13]]), y_calc[26], np.mean([y_calc[27], y_calc[28]]),
-                  np.mean([y_calc[27], y_calc[28]]),
-                  ar_av, ar_av, ar_av, ar_av, ar_av, np.mean([y_calc[19], y_calc[20]]),
-                  np.mean([y_calc[19], y_calc[20]]),
-                  y_calc[21], y_calc[22], np.mean([y_calc[23], y_calc[24]]), np.mean([y_calc[23], y_calc[24]]),
-                  ar_av, ar_av, ar_av, ar_av, ar_av,
-                  np.mean([y_calc[3], y_calc[4]]), np.mean([y_calc[3], y_calc[4]]), y_calc[5], y_calc[6]]
-
-
-        #Experimental shifts ordered, calibrated
-        y_exp = [1.24,3.33,0.78,
-                5.11,2.46,
-                 np.mean([3.47,5.67]),np.mean([3.47,5.67]),
-                3.72,1.87,0.73,
-                -0.63,4.47,2.62,2.62,
-                6.88,6.88,6.88,6.88,6.88,np.mean([1.30,2.67]),np.mean([1.30,2.67]),
-                4.03,4.51,np.mean([1.28,3.12]),np.mean([1.28,3.12]),
-                6.88,6.88,6.88,6.88,6.88,
-                4.19,4.19,7.43,8.36]
-
-
-    return np.array(y_sort), np.array(y_exp)
+    # Optimize shift RMSE with respect to ambiguous assignment
+    change = True
+    while change:
+        change = False
+        for unsure in ambiguous:
+            tmp_shields = np.copy(final_shields)
+            # Permute ambiguous assignment
+            for perm in it.permutations(unsure):
+                for i in range(len(perm)):
+                    tmp_shields[unsure[i]] = shields[perm[i]]
+                tmp_rmse = np.sqrt(np.mean(np.square([exp[k] - a*tmp_shields[k] - b for k in range(len(exp))])))
+                if tmp_rmse < best_rmse:
+                    final_shields = np.copy(tmp_shields)
+                    best_rmse = tmp_rmse
+                    change = True
+    comp_shifts = [a*final_shields[k] + b for k in range(len(exp))]
+    shifts_errs = np.abs(a)*shields_errs
+    return comp_shifts, shifts_errs, final_shields, best_rmse
 
 
 
-def lin(x,a,b):
-    return a-b*x
+def shift_rmsd(struct, e, options):
+    """
+    Compute chemical shift RMSD
 
-def rmsd(y_sort,y_exp, a, b):
-    popt, pcov = op.curve_fit(lin,y_sort,y_exp)
-    #rmsd = np.sqrt( sum( (y_exp-lin(y_sort,*popt))**2 )/len(y_sort))
-    rmsd = np.sqrt( sum( (y_exp-lin(y_sort,a, b))**2 )/len(y_sort))
-    return rmsd
+    Inputs:     - struct        Crystal structure
+                - e             Nucleus to consider
+                - options       Options
+                - exp_shifts    Experimental shifts
 
-# xyz = read("/Users/balodis/work/ritonavir/results/test/1_loops_0.005_factor__H1_True_C13_False_test_1/1_0_init_structure.cif")
-# y_pred = predict_shifts([xyz], krr, representation, trainsoaps, model_numbers, zeta, sp=1)
-# y_sort, y_exp = exp_rmsd(y_pred,molecule='ritonavir')
-# print y_sort
-# print y_exp
-# rms = rmsd(y_exp,y_sort)
-# print rms
+    Outputs:    - rmsd
+    """
 
-def exp_rmsd_13C(molecule="cocaine"):
+    N = len(options["exp_shifts"])
 
-    if molecule == "cocaine":
-        y_exp = [65.95,
-                 50.16,
-                 66.70,
-                 36.66,
-                 62.63,
-                 25.62,
-                 25.62,
-                 165.94,
-                 129.37,
-                 131.50,
-                 133.50,
-                 134.53,
-                 133.50,
-                 131.50,
-                 172.18,
-                 50.16,
-                 41.52]
-    return y_exp
+    # Predict shieldings
+    preds, errs = predict_shifts([struct], options["krr"], options["rep"], options["tr"], options["m_num"], options["zeta"], sp=symb2z[e])
 
-##Testing
-#Test
-# slope = {}
-# offset = {}
-# slope["H"] = 1.0
-# offset["H"] = 30.36
-# # np_load_old = np.load
-# # np.load = lambda *a,**k: np_load_old(*a, allow_pickle=True, **k)
-# krr, representation, trainsoaps, model_numbers, zeta = load_kernel(1)
-# #
-# xyz = read('../input_structures/azd8329/azd8329_csp.vc-relax.pdb')
-# y_pred = predict_shifts([xyz], krr, representation, trainsoaps, model_numbers, zeta, sp=1)
-# y_pred, y_exp = exp_rmsd(y_pred, molecule='azd')
-# chi_1H = rmsd(y_exp, y_pred, offset["H"], slope["H"])
-# print chi_1H
+    # Convert to shifts
+    _, _, _, rmse = best_fit_given_params(options["exp_shifts"], preds[:N], options["equivalent"], options["ambiguous"], options["slope"], options["offset"])
+
+    # If the chemical shift RMSE is smaller than the cutoff value set, return zero
+    if rmse < options["cutoff"]:
+        return options["cutoff"]
+
+    return rmse

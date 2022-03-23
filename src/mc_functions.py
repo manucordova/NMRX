@@ -1,343 +1,1140 @@
-# coding=utf-8
+###################################################################################################
+#####                                                                                         #####
+#####                      Functions to run the Monte-Carlo optimization                      #####
+#####                     Author: Manuel Cordova (manuel.cordova@epfl.ch)                     #####
+#####                                Last modified: 23.03.2022                                #####
+#####                                                                                         #####
+###################################################################################################
 
-import ase
-from ase.io import read,write
-import fnmatch
+### Import libraries
 import numpy as np
-from ase.spacegroup import crystal
-import random
+import sys
+import copy
+import scipy.optimize as op
 
-cluster = False
-if cluster:
-    root = "/scratch"
-else:
-    root = "/Users"
+### Import custom libraries
+sys.path.insert(0, "../src")
+# Import source files
+import ml_functions as ml
+import energy_functions as en
+import generate_crystals as cr
 
-
-
-def change_labels_from_0_to_1(in_file,out_file):
-    """Ase starts numbering from 0, so this file helps to translate the numbering that starts from 1"""
-    dump_in = open(in_file,"r")
-    dump_out = open(out_file,"w")
-    i = 1
-    for line in dump_in:
-        if fnmatch.fnmatch(line,'*ATOM*'):
-            old_line = line
-            if i == 10:
-                old_line = old_line.replace(' ','',1)
-            new_line = old_line.replace(str(i-1),str(i),1)
-            dump_out.write(new_line)
-            i = i + 1
-        else:
-            dump_out.write(line)
+# Available nuclei for ShiftML
+symb2z = {"H":1, "C":6, "N":7, "O":8}
 
 
-def convert_xyz(file_list,input_dir,output_dir,extension='pdb'):
-    """Helper function to convert xyz files to other formats"""
-    dump_in = open(file_list,"r")
-    for line in dump_in:
-        in_mol = read(input_dir + line[:-1],index='0')
-        in_mol.write(output_dir + line[:-4] + extension)
-    dump_in.close()
+def generate_T_profile(T_init, T_final, N, profile="linear", **kwargs):
+    """
+    Generate temperature profile
 
+    Inputs:     - T_init        Initial temperature [K]
+                - T_final       Final temperature [K]
+                - N             Number of points in temperature profile
+                - profile       Form of the temperature profile
+                - **kwargs      Additional arguments to define the form of the profile
 
-def extract_crystal_parameters(xyzPath,k):
-    fin = open(xyzPath + 'asym_unit/cocain_{}.xyz'.format(k), 'r')
-    data = fin.readlines()
-    fin.close()
-
-    # extract asym.unit information from file
-    nn = int(data[0])
-    uc = data[1].split(':')
-    sg = int(uc[1].split()[0])
-    uc = uc[-1].split()
-    lat = []
-    for i1 in range(0, 9):
-        lat.append(float(uc[i1]))
-    lat = np.array(lat).reshape((3, 3))
-    sites = []
-    frac = []
-    for dd in data[2:]:
-        dd = dd.split()
-        sites.append(dd[0])
-        ff = []
-        for i1 in range(1, 4):
-            ff.append(float(dd[i1]))
-        frac.append(ff)
-    return sites, frac, sg, lat
-
-def create_crystal(sites,frac,sg,lat):
-    return crystal(symbols=sites, basis=frac, spacegroup=sg, cell=lat, symprec=0.001)
-
-
-
-def rewrite_coordinate_old(test,molecule="cocaine"):
-    """A function to deal with change in coordinates after creating a crystal with ASE"""
-    coordinates = test.get_positions()
-
-    if molecule=="cocaine":
-        mapping_atom = range(85)[0::2]
-        new_sites = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C',
-                     'C', 'C', 'C', 'C', 'N', 'O', 'O', 'O', 'O', 'H', 'H', 'H', 'H', 'H',
-                     'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'C',
-                     'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C',
-                     'C', 'C', 'C', 'C', 'N', 'O', 'O', 'O', 'O', 'H', 'H', 'H', 'H', 'H',
-                     'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H']
-        new_coordinates = [0] * 86
-        i = 0
-        for line in coordinates:
-            if i in mapping_atom:
-                new_coordinates[mapping_atom.index(i)] = [line[0], line[1], line[2]]
-            else:
-                new_coordinates[mapping_atom.index(i - 1) + 43] = [line[0], line[1], line[2]]
-            i = i + 1
-
-    if molecule=="azd":
-        mapping_atom = range(124)[0::2]
-        new_sites = ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'N', 'N', 'N', 'O', 'O', 'O', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'N', 'N', 'N', 'O', 'O', 'O']
-        new_coordinates = [0] * 124
-        i = 0
-        for line in coordinates:
-            if i in mapping_atom:
-                new_coordinates[mapping_atom.index(i)] = [line[0], line[1], line[2]]
-            else:
-                new_coordinates[mapping_atom.index(i - 1) + 62] = [line[0], line[1], line[2]]
-            i = i + 1
-
-    if molecule=="azd":
-        mapping_atom = range(124)[0::2]
-        new_sites = ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'N', 'N', 'N', 'O', 'O', 'O', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'N', 'N', 'N', 'O', 'O', 'O']
-        new_coordinates = [0] * 124
-        i = 0
-        for line in coordinates:
-            if i in mapping_atom:
-                new_coordinates[mapping_atom.index(i)] = [line[0], line[1], line[2]]
-            else:
-                new_coordinates[mapping_atom.index(i - 1) + 62] = [line[0], line[1], line[2]]
-            i = i + 1
-
-    test.set_positions(new_coordinates)
-    test.set_chemical_symbols(new_sites)
-
-    return test
-
-
-def rewrite_coordinate(test,nr_molecules,molecule="cocaine"):
-    """A function to deal with change in coordinates after creating a crystal with ASE"""
-    coordinates = test.get_positions()
-
-    if molecule=="cocaine":
-        atoms = 43
-        new_sites = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C',
-                     'C', 'C', 'C', 'C', 'N', 'O', 'O', 'O', 'O', 'H', 'H', 'H', 'H', 'H',
-                     'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H']*nr_molecules
-    if molecule == "azd":
-        atoms = 62
-        new_sites = ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H',
-                     'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'C', 'C', 'C', 'C', 'C', 'C', 'C',
-                     'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'N',
-                     'N', 'N', 'O', 'O', 'O'] * nr_molecules
-    if molecule == "ritonavir":
-        atoms = 98
-        new_sites = ['S', 'S', 'O', 'O', 'O', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'N', 'C', 'C', 'C', 'C', 'C', 'C',
-                     'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C',
-                     'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'H', 'H', 'H', 'H', 'H', 'H', 'H',
-                     'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H',
-                     'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H',
-                     'H', 'H', 'H'] * nr_molecules
-
-    mapping_atom = range(atoms * nr_molecules - 1)[0::nr_molecules]
-
-    new_coordinates = [0] * atoms * nr_molecules
-    i = 0
-    for line in coordinates:
-        for j in range(nr_molecules):
-            #print i, j
-            if i - j in mapping_atom:
-                new_coordinates[mapping_atom.index(i - j) + atoms * j] = [line[0], line[1], line[2]]
-        i = i + 1
-
-    test.set_positions(new_coordinates)
-    test.set_chemical_symbols(new_sites)
-    return test
-
-
-
-
-
-def write_asym(frac_coord, space_group, lattice, sites, nr_mol, file_name):
-    frac = frac_coord
-    lat = lattice
-    cnr = nr_mol
-    Nat = len(sites)
-    sg = space_group
-
-    # write asym. unit as xyz (in comment line put lattice-params & space-group & nr of original conf)
-    data = '{}\n#SG: {} CONV: {} CELL (Angstrom): '.format(Nat, sg, cnr)
-    for i1 in range(0, 3):
-        data += ' {:f} {:f} {:f}'.format(lat[i1][0], lat[i1][1], lat[i1][2])
-    data += '\n'
-    for i1 in range(0, Nat):
-        data += '{}\t{:f}\t{:f}\t{:f}\n'.format(sites[i1], frac[i1][0], frac[i1][1], frac[i1][2])
-    fout = open(file_name, 'w')
-    fout.write(data)
-    fout.close()
-
-def gauss_number(mean=0.5):
-    while True:
-        # Checks
-        number = np.random.normal(mean, 0.2)
-        if number > 0 and number < 1:
-            break
-    return number
-
-
-
-
-
-
-
-def conf_angles(angle,randomizer="gauss",molecule="cocaine"):
-    high_angle = angle
-    low_angle = -angle
-
-    if randomizer == "uniform":
-        angle_1 = (high_angle - low_angle) * random.random() + low_angle
-        angle_2 = (high_angle - low_angle) * random.random() + low_angle
-        angle_3 = (high_angle - low_angle) * random.random() + low_angle
-        angle_4 = (high_angle - low_angle) * random.random() + low_angle
-        angle_5 = (high_angle - low_angle) * random.random() + low_angle
-        angle_6 = (high_angle - low_angle) * random.random() + low_angle
+    Outputs:    - T_profile     Array of temperatures
+    """
+    if profile == "linear":
+        T_profile = np.linspace(T_init, T_final, N)
     else:
-        angle_1 = (high_angle - low_angle) * gauss_number() + low_angle
-        angle_2 = (high_angle - low_angle) * gauss_number() + low_angle
-        angle_3 = (high_angle - low_angle) * gauss_number() + low_angle
-        angle_4 = (high_angle - low_angle) * gauss_number() + low_angle
-        angle_5 = (high_angle - low_angle) * gauss_number() + low_angle
-        angle_6 = (high_angle - low_angle) * gauss_number() + low_angle
-    return [angle_1,angle_2,angle_3,angle_4,angle_5,angle_6]
-
-
-def change_conformation(abc, angle_1, angle_2, angle_3, angle_4, angle_5, angle_6, molecule):
-
-    mask = np.zeros(len(abc))
-    if molecule == "cocaine":
-        for k1 in [8, 9, 10, 11, 12, 13, 32, 33, 34, 35, 36]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=13, a2=8, a3=7, a4=18, angle=angle_1, mask=mask)
-
-        mask = np.zeros(len(abc))
-        for k1 in [8, 9, 10, 11, 12, 13, 32, 33, 34, 35, 36, 19, 7]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=19, a2=7, a3=18, a4=2, angle=angle_2, mask=mask)
-
-        mask = np.zeros(len(abc))
-        for k1 in [8, 9, 10, 11, 12, 13, 32, 33, 34, 35, 36, 19, 7, 18]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=7, a2=18, a3=2, a4=3, angle=angle_3, mask=mask)
-
-        mask = np.zeros(len(abc))
-        for k1 in [20, 14, 21, 15, 37, 38, 39]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=2, a2=1, a3=14, a4=20, angle=angle_4, mask=mask)
-
-        mask = np.zeros(len(abc))
-        for k1 in [21, 15, 37, 38, 39]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=1, a2=14, a3=21, a4=15, angle=angle_5, mask=mask)
-
-    if molecule == "azd":
-
-        mask = np.zeros(len(abc))
-        for k1 in [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,42,43,44,45,46,47,48,49,50,51]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=6, a2=58, a3=42, a4=7, angle=angle_1, mask=mask)
-
-        mask = np.zeros(len(abc))
-        for k1 in [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,42,43,44,45,46,47,48,49,50,51,58,6]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=61, a2=41, a3=58, a4=6, angle=angle_2, mask=mask)
-
-        mask = np.zeros(len(abc))
-        for k1 in [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,42,43,44,45,46,47,48,49,50,51,58,6,41,61]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=40, a2=39, a3=41, a4=61, angle=angle_3, mask=mask)
-
-        mask = np.zeros(len(abc))
-        for k1 in [52,53,54,55,28,29,30,23,22,24,25,26,27]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=55, a2=52, a3=38, a4=39, angle=angle_4, mask=mask)
-
-        mask = np.zeros(len(abc))
-        for k1 in [4, 60, 37, 59, 33, 32, 31, 36, 35, 34, 1, 0, 2, 3]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=31, a2=36, a3=56, a4=57, angle=angle_5, mask=mask)
-
-        mask = np.zeros(len(abc))
-        for k1 in [4, 60, 37, 59]:
-            mask[k1] = 1
-        abc.rotate_dihedral(a1=59, a2=37, a3=33, a4=32, angle=angle_6, mask=mask)
-
-    if molecule == "ritonavir":
-        pass
-
-    #print angle_1, angle_2, angle_3, angle_4, angle_5
-    return abc
-
-# def conf_angles(angle,randomizer="gauss",molecule="cocaine"):
-#     high_angle = angle
-#     low_angle = -angle
-#
-#     if randomizer == "uniform":
-#         angle_1 = (high_angle - low_angle) * random.random() + low_angle
-#         angle_2 = (high_angle - low_angle) * random.random() + low_angle
-#         angle_3 = (high_angle - low_angle) * random.random() + low_angle
-#         angle_4 = (high_angle - low_angle) * random.random() + low_angle
-#         angle_5 = (high_angle - low_angle) * random.random() + low_angle
-#         angle_6 = (high_angle - low_angle) * random.random() + low_angle
-#     else:
-#         angle_1 = (high_angle - low_angle) * gauss_number() + low_angle
-#         angle_2 = (high_angle - low_angle) * gauss_number() + low_angle
-#         angle_3 = (high_angle - low_angle) * gauss_number() + low_angle
-#         angle_4 = (high_angle - low_angle) * gauss_number() + low_angle
-#         angle_5 = (high_angle - low_angle) * gauss_number() + low_angle
-#         angle_6 = (high_angle - low_angle) * gauss_number() + low_angle
-#     return [angle_1,angle_2,angle_3,angle_4,angle_5]
-#
-#
-# def change_conformation(abc, angle_1, angle_2, angle_3, angle_4, angle_5):
-#
-#     mask = np.zeros(len(abc))
-#     for k1 in [8, 9, 10, 11, 12, 13, 32, 33, 34, 35, 36]:
-#         mask[k1] = 1
-#     abc.rotate_dihedral(a1=13, a2=8, a3=7, a4=18, angle=angle_1, mask=mask)
-#
-#     mask = np.zeros(len(abc))
-#     for k1 in [8, 9, 10, 11, 12, 13, 32, 33, 34, 35, 36, 19, 7]:
-#         mask[k1] = 1
-#     abc.rotate_dihedral(a1=19, a2=7, a3=18, a4=2, angle=angle_2, mask=mask)
-#
-#     mask = np.zeros(len(abc))
-#     for k1 in [8, 9, 10, 11, 12, 13, 32, 33, 34, 35, 36, 19, 7, 18]:
-#         mask[k1] = 1
-#     abc.rotate_dihedral(a1=7, a2=18, a3=2, a4=3, angle=angle_3, mask=mask)
-#
-#     mask = np.zeros(len(abc))
-#     for k1 in [20, 14, 21, 15, 37, 38, 39]:
-#         mask[k1] = 1
-#     abc.rotate_dihedral(a1=2, a2=1, a3=14, a4=20, angle=angle_4, mask=mask)
-#
-#     mask = np.zeros(len(abc))
-#     for k1 in [21, 15, 37, 38, 39]:
-#         mask[k1] = 1
-#     abc.rotate_dihedral(a1=1, a2=14, a3=21, a4=15, angle=angle_5, mask=mask)
-#
-#     #print angle_1, angle_2, angle_3, angle_4, angle_5
-#     return abc
+        raise ValueError("Temperature profile not implemented yet! ({})".format(form))
+    return T_profile
 
 
 
+def compute_cost_part(struct, cost_type, cost_options):
+    """
+    Compute one part of the cost function
 
-# xyz=read('/Users/balodis/work/cocaine/structure_files/COCAIN10_H_relaxed_out_cell.pdb')
-# angles = conf_angles(0)
-# view(change_conformation(xyz,angles[0],angles[1],angles[2],angles[3],angles[4]))
+    Inputs:     - struct            Crystal structure
+                - cost_type         Cost function part
+                - cost_options      Dictionary of options specific to each cost function part
+                - exp_shifts        Experimental chemical shifts
+
+    Outputs:    - cost              Value of the cost computed
+    """
+
+    if cost_type == "E":
+        cost = en.dftbplus_energy(cost_options["directory"], struct, cost_options["dftb_path"])
+    elif cost_type in symb2z.keys():
+        cost = ml.shift_rmsd(struct, cost_type, cost_options)
+    elif cost_type == "D":
+        cost = en.compute_distance_constraints(struct, cost_options["n_atoms"], cost_options["pairs"], cost_options["thresh"], cost_options["exponent"], cost_options["contact"], cost_options["c_type"])
+    else:
+        raise ValueError("Unknown cost function type: {}".format(cost_type))
+
+    return cost
+
+
+
+def compute_cost(struct, cost_function, cost_factors, cost_options):
+    """
+    Compute the cost function
+
+    Inputs:     - struct            Crystal structure
+                - cost_function     Array of the cost function parts
+                - cost_factors      Dictionary of the factor of each cost function part
+                - cost_options      Dictionary of options specific to each cost function part
+
+    Outputs:    - cost              Dictionary of the total cost function and of its parts
+    """
+
+    cost = {}
+    cost["Tot"] = 0
+
+    for c in cost_function:
+        cost[c] = compute_cost_part(struct, c, cost_options[c])
+        cost["Tot"] += cost[c]*cost_factors[c]
+
+    return cost
+
+
+
+def generate_random_unit_vector():
+    """
+    Generate a random unit vector
+
+    Outputs:    - v     Random unit vector
+    """
+
+    v = np.zeros(3)
+    v[0] = np.random.normal(loc=0.0, scale=1.0)
+    v[1] = np.random.normal(loc=0.0, scale=1.0)
+    v[2] = np.random.normal(loc=0.0, scale=1.0)
+
+    return v / np.linalg.norm(v)
+
+
+
+def randomize(param_to_change, lat, trans, R, conf_angles, step_list, A=1.):
+    """
+    Randomize a randomly selected parameter, with amplitude given by the step in step list and scaled by A.
+
+    Inputs:     - parameter_set     Set of parameters
+                - param_to_change   Parameter to randomly change
+                - lat               Unit cell parameters
+                - trans             Translation vector
+                - R                 Rotation matrix
+                - conf_angles       List of conformational angles
+                - step_list         List of step size for each parameters
+                - A                 Amplitude of the change
+
+    Outputs:    - new_lat           Updated unit cell parameters
+                - new_trans         Updated translation vector
+                - new_R             Updated rotation matrix
+                - new_conf          Updated conformational angles
+    """
+
+    new_lat = copy.deepcopy(lat)
+    new_trans = copy.deepcopy(trans)
+    new_R = copy.deepcopy(R)
+    new_conf = copy.deepcopy(conf_angles)
+
+    if param_to_change == "a":
+        new_lat[0] = lat[0] + (1 - (2 * np.random.random())) * step_list[0] * A
+    if param_to_change == "b":
+        new_lat[1] = lat[1] + (1 - (2 * np.random.random())) * step_list[0] * A
+    if param_to_change == "c":
+        new_lat[2] = lat[2] + (1 - (2 * np.random.random())) * step_list[0] * A
+
+    valid_angles = False
+    while not valid_angles:
+        if param_to_change == "alpha":
+            new_lat[3] = lat[3] + (1 - (2 * np.random.random())) * step_list[1] * A
+        if param_to_change == "beta":
+            new_lat[4] = lat[4] + (1 - (2 * np.random.random())) * step_list[1] * A
+        if param_to_change == "gamma":
+            new_lat[5] = lat[5] + (1 - (2 * np.random.random())) * step_list[1] * A
+
+        valid_angles = cr.check_valid_angles(new_lat[3], new_lat[4], new_lat[5])
+
+    if param_to_change == "trans":
+        v = generate_random_unit_vector()
+        new_trans += v * step_list[2] * A
+        change = True
+        # Regularize translation vector such that each component is always within [0, 1[
+        while change:
+            change = False
+            for i in range(3):
+                if new_trans[i] >= 1.:
+                    change = True
+                    new_trans[i] -= 1.
+                if new_trans[i] < 0.:
+                    change = True
+                    new_trans[i] += 1.
+
+    if param_to_change == "rot":
+        new_R = cr.generate_random_rot(step_list[3] * A)
+        new_R = new_R.dot(R)
+
+    if param_to_change == "conf":
+        conf_list = list(range(len(conf_angles)))
+        i = np.random.choice(conf_list)
+        new_conf[i] += (1 - (2 * np.random.random())) * step_list[4] * A
+        # Regularize conformational angles such that they are always within [0, 360[
+        while new_conf[i] < 0.:
+            new_conf[i] += 360.
+        while new_conf[i] >= 360.:
+            new_conf[i] -= 360.
+
+    return new_lat, new_trans, new_R, new_conf
+
+
+
+def normalize_amplitude(Amp, param_to_change, step_size, max_step_size, verbose=False):
+    """
+    Restrict the amplitude of a parameter change to comply with the maximum step size set.
+
+    Inputs: - Amp               Directory of amplitudes
+            - param_to_change   Parameter to normalize the amplitude for
+            - step_size         Initial step size
+            - max_step_size     Maximum step size
+            - verbose           Verbosity level
+
+    Output: - Amp               Updated directory of amplitudes
+    """
+
+    old_amp = Amp[param_to_change]
+    change = False
+
+    if param_to_change in ["a", "b", "c"]:
+        while Amp[param_to_change] * step_size[0] > max_step_size[0]:
+            Amp[param_to_change] /= 2
+            change = True
+
+    elif param_to_change in ["alpha", "beta", "gamma"]:
+        while Amp[param_to_change] * step_size[1] > max_step_size[1]:
+            Amp[param_to_change] /= 2
+            change = True
+
+    elif param_to_change == "trans":
+        while Amp[param_to_change] * step_size[2] > max_step_size[2]:
+            Amp[param_to_change] /= 2
+            change = True
+
+    elif param_to_change == "rot":
+        while Amp[param_to_change] * step_size[3] > max_step_size[3]:
+            Amp[param_to_change] /= 2
+            change = True
+
+    elif param_to_change == "conf":
+        while Amp[param_to_change] * step_size[4] > max_step_size[4]:
+            Amp[param_to_change] /= 2
+            change = True
+
+    if verbose and change:
+        print("  Amplitude decreased from {} to {}".format(old_amp, Amp[param_to_change]))
+
+    return Amp
+
+
+
+def current_parameter(p, lat, trans, R, conf_angles):
+    """
+    Obtain the current value of parameter p.
+
+    Inputs:     - p             Parameter to monitor
+                - lat           Unit cell parameters
+                - trans         Translation vector
+                - R             Rotation matrix
+                - conf_angles   List of conformational angles
+
+    outputs:    - v             Value of parameter p
+    """
+
+    if p == "a":
+        return lat[0]
+    if p == "b":
+        return lat[1]
+    if p == "c":
+        return lat[2]
+
+    if p == "alpha":
+        return lat[3]
+    if p == "beta":
+        return lat[4]
+    if p == "gamma":
+        return lat[5]
+
+    if p == "trans":
+        return trans
+
+    if p == "rot":
+        return R
+
+    if p == "conf":
+        return conf_angles
+
+    raise ValueError("Unknown parameter: {}".format(p))
+    return
+
+
+
+def to_minimize(x, struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params, verbose):
+    """
+    Function to minimize in the simplex algorithm
+
+    Inputs:     - x                     List of values of the parameters to optimize
+                - struct                Initial crystal structure
+                - lat                   Starting lattice parameters
+                - trans                 Starting translation vector (fractions of the unit cell)
+                - R                     Starting rotation matrix
+                - conf_angles           Starting conformational angles
+                - sg                    Space group of the crystal
+                - n_atoms               Number of atoms in the molecule
+                - parameter_set         Set of parameters to optimize
+                - cost_function         Form of the cost function
+                - cost_factors          Factors of each part of the cost function
+                - cost_options          Options for the parts of the cost function
+                - conf_params           Atoms and mask in conformer angles
+                - verbose               Verbosity level
+
+    Outputs:    - cost["Tot"]           Value of the cost function
+    """
+    new_lat = copy.deepcopy(lat)
+    new_trans = copy.deepcopy(trans)
+    new_R = copy.deepcopy(R)
+    new_conf = copy.deepcopy(conf_angles)
+
+    # Set optimized parameters
+    k = 0
+    # Lattice parameters
+    for m, p in enumerate(["a", "b", "c", "alpha", "beta", "gamma"]):
+        if p in parameter_set:
+            new_lat[m] = x[k]
+            k += 1
+    # Translation
+    if "trans" in parameter_set:
+        new_trans = x[k:k+3]
+        k += 3
+    # Rotation
+    if "rot" in parameter_set:
+        rx = x[k]
+        ry = x[k+1]
+        rz = x[k+2]
+        Rx = cr.rotation_matrix([1., 0., 0., rx])
+        Ry = cr.rotation_matrix([0., 1., 0., ry])
+        Rz = cr.rotation_matrix([0., 0., 1., rz])
+        new_R = Rx.dot(Ry.dot(Rz.dot(R)))
+        k += 3
+    # Conformation
+    if "conf" in parameter_set:
+        new_conf = x[k:]
+
+    new_cryst, clash = cr.create_crystal(struct, new_lat, new_trans, new_R, new_conf, sg, n_atoms, conf_params=conf_params)
+
+    if not clash:
+        # Check intramolecular clashes
+        clash = cr.check_clash(new_cryst, n_atoms, pbc=True, clash_type="intra", factor=0.85)
+        if not clash:
+            # Check intermolecular clashes
+            clash = cr.check_clash(new_cryst, n_atoms, pbc=True, clash_type="inter", factor=0.85)
+
+    if clash:
+        print("CLASH")
+        cost = {}
+        cost["Tot"] = 1e12
+    else:
+        cost = compute_cost(new_cryst, cost_function, cost_factors, cost_options)
+
+    return cost["Tot"]
+
+
+
+def simplex_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, cell_params_lims, conf_params=None, verbose=False):
+    """
+    Optimize the cost function with respect to parameters
+
+    Inputs:     - struct                Initial crystal structure
+                - lat                   Starting lattice parameters
+                - trans                 Starting translation vector (fractions of the unit cell)
+                - R                     Starting rotation matrix
+                - conf_angles           Starting conformational angles
+                - sg                    Space group of the crystal
+                - n_atoms               Number of atoms in the molecule
+                - parameter_set         Set of parameters to optimize
+                - cost_function         Form of the cost function
+                - cost_factors          Factors of each part of the cost function
+                - cost_options          Options for the parts of the cost function
+                - conf_params           Atoms and mask in conformer angles
+                - verbose               Verbosity level
+
+    Outputs:    - opt_crystal           Optimized crystal structure
+                - opt_lat               Optimized lattice parameters
+                - opt_trans             Optimized translation vector
+                - opt_R                 Optimized rotation matrix
+                - opt_conf              Optimized conformational angles
+    """
+
+    # Set initial parameters and boundaries
+    x0 = []
+    bounds = []
+    # Lattice parameters
+    for k, p in enumerate(["a", "b", "c", "alpha", "beta", "gamma"]):
+        if p in parameter_set:
+            x0.append(lat[k])
+            if p in ["a", "b", "c"]:
+                bounds.append((cell_params_lims[0], cell_params_lims[1]))
+            elif p in ["alpha", "beta", "gamma"]:
+                bounds.append((cell_params_lims[2], cell_params_lims[3]))
+            else:
+                raise ValueError("Unknown parameter: {}".format(p))
+    # Translation
+    if "trans" in parameter_set:
+        x0.extend(list(trans))
+        bounds.extend([(0., 1.), (0., 1.), (0., 1.)])
+    # Rotation
+    if "rot" in parameter_set:
+        x0.extend([0., 0., 0.])
+        bounds.extend([(-180., 180.), (-180., 180.), (-180., 180.)])
+    # Conformation
+    if "conf" in parameter_set:
+        x0.extend(list(conf_angles))
+        for _ in range(len(conf_angles)):
+            bounds.append((0., 360.))
+
+    # Optimize cost function
+    res = op.minimize(to_minimize, x0, args=(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, conf_params, verbose), method="Nelder-Mead", options={"fatol":1e-2})
+
+    opt_lat = copy.deepcopy(lat)
+    opt_trans = copy.deepcopy(trans)
+    opt_R = copy.deepcopy(R)
+    opt_conf = copy.deepcopy(conf_angles)
+
+    # Set optimized parameters
+    k = 0
+    # Lattice parameters
+    for p in ["a", "b", "c", "alpha", "beta", "gamma"]:
+        if p in parameter_set:
+            opt_lat[k] = res.x[k]
+            k += 1
+    # Translation
+    if "trans" in parameter_set:
+        opt_trans = res.x[k:k+3]
+        k += 3
+    # Rotation
+    if "rot" in parameter_set:
+        opt_Rx = cr.rotation_matrix([1., 0., 0., res.x[k]])
+        opt_Ry = cr.rotation_matrix([0., 1., 0., res.x[k+1]])
+        opt_Rz = cr.rotation_matrix([0., 0., 1., res.x[k+2]])
+        opt_R = opt_Rx.dot(opt_Ry.dot(opt_Rz.dot(R)))
+        k += 3
+    # Conformation
+    if "conf" in parameter_set:
+        opt_conf = res.x[k:]
+
+    # Generate optimized crystal
+    opt_crystal, _ = cr.create_crystal(struct, opt_lat, opt_trans, opt_R, opt_conf, sg, n_atoms, conf_params=conf_params)
+
+    return opt_crystal, opt_lat, opt_trans, opt_R, opt_conf
+
+
+
+def optimize_lat_param(struct, p, best_cost, bounds, lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=None, step=1e-2, ftol=1e-2, xtol=1e-4, thresh_type="abs", verbose=False):
+    """
+    Optimize the cost function with respect to all lattice parameters, iteratively.
+
+    Inputs:     - struct                Input crystal structure
+                - p                     Cell parameter to change
+                - best_cost             Initial cost
+                - bounds                Bounds for the parameter
+                - lat                   Initial lattice parameters
+                - trans                 Translation vector
+                - R                     Rotation matrix
+                - conf_angles           Conformational angles
+                - sg                    Space group of the crystal
+                - n_atoms               Number of atoms in the molecules
+                - cost_function         Form of the cost function
+                - cost_factors          Factors of each part of the cost function
+                - cost_options          Options for the parts of the cost function
+                - conf_params           Atoms and masks in conformer angles
+                - step                  Step size (fraction of the range of parameter)
+                - ftol                  Tolerance for convergence of the cost function
+                - xtol                  Tolerance for convergence of the step size
+                - thresh_type           Set to "abs" for absolute convergence of the cost function,
+                                            "rel" for relative convergence
+
+    Outputs:    - best_lat              Optimized lattice parameters
+                - best_cost             Optimized cost function
+    """
+
+    best_lat = copy.deepcopy(lat)
+    lat_ind = {"a":0, "b":1, "c":2, "alpha":3, "beta":4, "gamma":5}
+
+    # If the step size is too small, return the original lattice parameter
+    if step < xtol:
+        return best_lat, best_cost
+
+    if verbose:
+        print("  Optimizing parameter {}. Initial value {}, step size {}".format(p, lat[lat_ind[p]], step))
+
+    # Display warning if the initial parameters are outside the bounds
+    if lat[lat_ind[p]] > bounds[1] or lat[lat_ind[p]] < bounds[0]:
+        print("  WARNING: the initial parameters are outside the bounds")
+
+    # Obtain step size
+    span = bounds[1]-bounds[0]
+    dx = span * step
+
+    # Generate steps in positive and negative directions
+    tmp_lat_p = copy.copy(best_lat)
+    tmp_lat_p[lat_ind[p]] += dx
+    tmp_lat_m = copy.copy(best_lat)
+    tmp_lat_m[lat_ind[p]] -= dx
+
+    # Restrict parameters to be within the bounds
+    if tmp_lat_p[lat_ind[p]] > bounds[1]:
+        tmp_lat_p[lat_ind[p]] = bounds[1]
+    if tmp_lat_p[lat_ind[p]] < bounds[0]:
+        tmp_lat_p[lat_ind[p]] = bounds[0]
+    if tmp_lat_m[lat_ind[p]] > bounds[1]:
+        tmp_lat_m[lat_ind[p]] = bounds[1]
+    if tmp_lat_m[lat_ind[p]] < bounds[0]:
+        tmp_lat_m[lat_ind[p]] = bounds[0]
+
+    # Generate modified crystals
+    cryst_p, clash_p = cr.create_crystal(struct, tmp_lat_p, trans, R, conf_angles, sg, n_atoms, conf_params=conf_params)
+    cryst_m, clash_m = cr.create_crystal(struct, tmp_lat_m, trans, R, conf_angles, sg, n_atoms, conf_params=conf_params)
+
+    # Compute cost of the modified crystals
+    if clash_p:
+        tmp_cost_p["Tot"] = 1e12
+    else:
+        tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
+    if clash_m:
+        tmp_cost_m["Tot"] = 1e12
+    else:
+        tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
+
+    # If no direction is found, decrease the step size by two and try again
+    if tmp_cost_p["Tot"] >= best_cost["Tot"]-1e-6 and tmp_cost_m["Tot"] >= best_cost["Tot"]-1e-6:
+        if verbose:
+            print("  Minimum found, decreasing step size")
+        return optimize_lat_param(struct, p, best_cost, bounds, lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+    # If positive direction is found, increase the parameter until energy rises
+    elif tmp_cost_p["Tot"] < best_cost["Tot"] and tmp_cost_p["Tot"] < tmp_cost_m["Tot"]:
+        if verbose:
+            print("  Increasing the parameter decreases the cost")
+        # While the energy decreases
+        while tmp_cost_p["Tot"] < best_cost["Tot"]:
+            # Update the best parameter and associated cost
+            best_cost = copy.copy(tmp_cost_p)
+            best_lat = copy.copy(tmp_lat_p)
+            # Generate a new parameter
+            tmp_lat_p[lat_ind[p]] += dx
+            # Generate the corresponding crystal
+            cryst_p, clash_p = cr.create_crystal(struct, tmp_lat_p, trans, R, conf_angles, sg, n_atoms, conf_params=conf_params)
+            # Compute cost
+            if clash_p:
+                tmp_cost_p["Tot"] = 1e12
+            else:
+                tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
+            if verbose:
+                print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_p["Tot"]))
+        # Restart the optimization with reduced step size
+        return optimize_lat_param(struct, p, best_cost, bounds, best_lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+    # If negative direction is found, increase the parameter until energy rises
+    elif tmp_cost_m["Tot"] < best_cost["Tot"] and tmp_cost_m["Tot"] < tmp_cost_p["Tot"]:
+        if verbose:
+            print("  Decreasing the parameter decreases the cost")
+        # While the energy decreases
+        while tmp_cost_m["Tot"] < best_cost["Tot"]:
+            # Update the best parameter and associated cost
+            best_cost = copy.copy(tmp_cost_m)
+            best_lat = copy.copy(tmp_lat_m)
+            # Generate a new parameter
+            tmp_lat_m[lat_ind[p]] -= dx
+            # Generate the corresponding crystal
+            cryst_m, clash_m = cr.create_crystal(struct, tmp_lat_m, trans, R, conf_angles, sg, n_atoms, conf_params=conf_params)
+            # Compute cost
+            if clash_m:
+                tmp_cost_m["Tot"] = 1e12
+            else:
+                tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
+            if verbose:
+                print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_m["Tot"]))
+        # Restart the optimization with reduced step size
+        return optimize_lat_param(struct, p, best_cost, bounds, best_lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+    else:
+        raise ValueError("Error during the optimization of {}".format(p))
+        return
+
+
+
+def roll_zeropad(a, shift, axis=None):
+    """
+    Roll array elements along a given axis. Elements off the end of the array are treated as zeros.
+
+    Inputs:     - a         Input array
+                - shift     Number of places by which elements are shifted
+                - axis      Axis along which elements are shifted
+
+    Outputs:    - res       Shifted array
+    """
+
+    a = np.asanyarray(a)
+    if shift == 0: return a
+    if axis is None:
+        n = a.size
+        reshape = True
+    else:
+        n = a.shape[axis]
+        reshape = False
+    if np.abs(shift) > n:
+        res = np.zeros_like(a)
+    elif shift < 0:
+        shift += n
+        zeros = np.zeros_like(a.take(np.arange(n-shift), axis))
+        res = np.concatenate((a.take(np.arange(n-shift,n), axis), zeros), axis)
+    else:
+        zeros = np.zeros_like(a.take(np.arange(n-shift,n), axis))
+        res = np.concatenate((zeros, a.take(np.arange(n-shift), axis)), axis)
+    if reshape:
+        return res.reshape(a.shape)
+    else:
+        return res
+
+
+
+def optimize_trans(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=None, step=1e-2, ftol=1e-2, xtol=1e-4, thresh_type="abs", verbose=False):
+    """
+    Optimize the cost function with respect to the translation vector.
+
+    Inputs:     - struct                Input crystal structure
+                - best_cost             Initial cost
+                - bounds                Bounds for the parameter
+                - lat                   Lattice parameters
+                - trans                 Initial translation vector
+                - R                     Rotation matrix
+                - conf_angles           Conformational angles
+                - sg                    Space group of the crystal
+                - n_atoms               Number of atoms in the molecules
+                - cost_function         Form of the cost function
+                - cost_factors          Factors of each part of the cost function
+                - cost_options          Options for the parts of the cost function
+                - conf_params           Atoms and masks in conformer angles
+                - step                  Step size (fraction of the range of parameter)
+                - ftol                  Tolerance for convergence of the cost function
+                - xtol                  Tolerance for convergence of the step size
+                - thresh_type           Set to "abs" for absolute convergence of the cost function,
+                                            "rel" for relative convergence
+
+    Outputs:    - best_trans            Optimized translation vector
+                - best_cost             Optimized cost function
+    """
+
+    best_trans = copy.deepcopy(trans)
+
+    # If the step size is too small, return the original lattice parameter
+    if step < xtol:
+        return best_trans, best_cost
+
+    if verbose:
+        print("  Optimizing translation, step size {}".format(step))
+        print("  Initial translation vector: {:.4f}, {:.4f}, {:.4f}".format(trans[0], trans[1], trans[2]))
+
+    # Obtain step size
+    span = bounds[1]-bounds[0]
+    dx = span * step
+
+    # Initialize grid of steps and costs
+    trans_grid = np.zeros((3,3,3,3))
+    cost_grid = np.zeros((3,3,3))
+
+    # Initialize optimized translation vector and cost
+    opt_trans = copy.deepcopy(best_trans)
+    opt_inds = (1,1,1)
+    opt_cost = copy.deepcopy(best_cost)
+    cost_grid[1,1,1] = best_cost["Tot"]
+
+    # Check that any direction yields an improvement
+    improve = False
+    for i in range(3):
+        # Positive displacement along axis i
+        tmp_trans = copy.deepcopy(best_trans)
+        tmp_trans[i] += dx
+        tmp_cryst, clash = cr.create_crystal(struct, lat, tmp_trans, R, conf_angles, sg, n_atoms, conf_params=conf_params)
+        if clash:
+            tmp_cost ={}
+            tmp_cost["Tot"] = 1e12
+        else:
+            tmp_cost = compute_cost(tmp_cryst, cost_function, cost_factors, cost_options)
+
+        # If we found a new minimum, update the optimized cost, translation vector and index
+        if tmp_cost["Tot"] < opt_cost["Tot"]:
+            opt_cost = copy.deepcopy(tmp_cost)
+            opt_trans = copy.deepcopy(tmp_trans)
+            if i == 0:
+                opt_inds =(2,1,1)
+            elif i == 1:
+                opt_inds =(1,2,1)
+            elif i == 2:
+                opt_inds =(1,1,2)
+
+        # Set cost grid values already computed
+        if i == 0:
+            cost_grid[2, 1, 1] = tmp_cost["Tot"]
+        elif i == 1:
+            cost_grid[1, 2, 1] = tmp_cost["Tot"]
+        elif i == 2:
+            cost_grid[1, 1, 2] = tmp_cost["Tot"]
+
+        if tmp_cost["Tot"] < best_cost["Tot"]:
+            improve = True
+
+        # Negative displacement along axis i
+        tmp_trans = copy.deepcopy(best_trans)
+        tmp_trans[i] -= dx
+        tmp_cryst, clash = cr.create_crystal(struct, lat, tmp_trans, R, conf_angles, sg, n_atoms, conf_params=conf_params)
+        if clash:
+            tmp_cost ={}
+            tmp_cost["Tot"] = 1e12
+        else:
+            tmp_cost = compute_cost(tmp_cryst, cost_function, cost_factors, cost_options)
+
+        # If we found a new minimum, update the optimized cost, translation vector and index
+        if tmp_cost["Tot"] < opt_cost["Tot"]:
+            opt_cost = copy.deepcopy(tmp_cost)
+            opt_trans = copy.deepcopy(tmp_trans)
+            if i == 0:
+                opt_inds =(0,1,1)
+            elif i == 1:
+                opt_inds =(1,0,1)
+            elif i == 2:
+                opt_inds =(1,1,0)
+
+        # Set cost grid values already computed
+        if i == 0:
+            cost_grid[0, 1, 1] = tmp_cost["Tot"]
+        elif i == 1:
+            cost_grid[1, 0, 1] = tmp_cost["Tot"]
+        elif i == 2:
+            cost_grid[1, 1, 0] = tmp_cost["Tot"]
+
+        if tmp_cost["Tot"] < best_cost["Tot"]:
+            improve = True
+
+    if not improve:
+        return optimize_trans(struct, best_cost, bounds, lat, best_trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+    # Optimize the translation vector
+    while opt_cost["Tot"] < best_cost["Tot"]-1e-6:
+
+        if verbose:
+            print("  Optimized translation vector: {:.4f}, {:.4f}, {:.4f}".format(opt_trans[0], opt_trans[1], opt_trans[2]))
+            print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], opt_cost["Tot"]))
+
+        best_trans = copy.deepcopy(opt_trans)
+        best_cost = copy.deepcopy(opt_cost)
+
+        # Update grid of translation vectors
+        trans_grid[0,:,:,0] = best_trans[0] - dx
+        trans_grid[1,:,:,0] = best_trans[0]
+        trans_grid[2,:,:,0] = best_trans[0] + dx
+        trans_grid[:,0,:,1] = best_trans[1] - dx
+        trans_grid[:,1,:,1] = best_trans[1]
+        trans_grid[:,2,:,1] = best_trans[1] + dx
+        trans_grid[:,:,0,2] = best_trans[2] - dx
+        trans_grid[:,:,1,2] = best_trans[2]
+        trans_grid[:,:,2,2] = best_trans[2] + dx
+
+        # Normalize the translation vectors to be within [0, 1[
+        trans_grid[np.where(trans_grid >= 1.)] -= 1.
+        trans_grid[np.where(trans_grid < 0.)] += 1.
+
+        # Center grid of costs around the best cost
+        for i in range(3):
+            r = 1-opt_inds[i]
+            cost_grid = roll_zeropad(cost_grid, r, axis=i)
+        # Update the cost grid elements that are newly introduced
+        for i in range(3):
+            for j in range(3):
+                for k in range(3):
+                    if cost_grid[i, j, k] == 0.:
+                        tmp_cryst, clash = cr.create_crystal(struct, lat, trans_grid[i, j, k], R, conf_angles, sg, n_atoms, conf_params=conf_params)
+                        if clash:
+                            tmp_cost = {}
+                            tmp_cost["Tot"] = 1e12
+                        else:
+                            tmp_cost = compute_cost(tmp_cryst, cost_function, cost_factors, cost_options)
+                        cost_grid[i, j, k] = tmp_cost["Tot"]
+
+        # Get minimum cost and associated translation vector index
+        min_cost = np.min(cost_grid)
+        best_inds = np.where(np.isclose(cost_grid, min_cost, atol=1e-6, rtol=1e-12))
+        num_1 = -1
+        opt_inds = (1,1,1)
+        for i in range(len(best_inds[0])):
+            # if the best cost is in the central index, restart the optimization with a reduced step size
+            if best_inds[0][i] == 1 and best_inds[1][i] == 1 and best_inds[2][i] == 1:
+                print("  Minimum found, decreasing step size")
+                return optimize_trans(struct, best_cost, bounds, lat, opt_trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+            # Get indices that are closest to the center as the central indices
+            n = 0
+            for j in range(3):
+                if best_inds[j][i] == 1:
+                    n += 1
+            if n > num_1:
+                num_1 = n
+                opt_inds = (best_inds[0][i], best_inds[1][i], best_inds[2][i])
+
+        opt_trans = copy.deepcopy(trans_grid[opt_inds])
+        opt_cryst, clash = cr.create_crystal(struct, lat, opt_trans, R, conf_angles, sg, n_atoms, conf_params=conf_params)
+        opt_cost = compute_cost(opt_cryst, cost_function, cost_factors, cost_options)
+
+    return optimize_trans(struct, opt_cost, bounds, lat, opt_trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+
+
+def optimize_rot(struct, best_cost, bounds, lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=None, step=1e-2, ftol=1e-2, xtol=1e-4, thresh_type="abs", verbose=False, N_max=10):
+    """
+    Optimize the cost function with respect to the rotation matrix.
+
+    Inputs:     - struct                Input crystal structure
+                - best_cost             Initial cost
+                - bounds                Bounds for the parameter
+                - lat                   Lattice parameters
+                - trans                 Initial translation vector
+                - R                     Rotation matrix
+                - conf_angles           Conformational angles
+                - sg                    Space group of the crystal
+                - n_atoms               Number of atoms in the molecules
+                - cost_function         Form of the cost function
+                - cost_factors          Factors of each part of the cost function
+                - cost_options          Options for the parts of the cost function
+                - conf_params           Atoms and masks in conformer angles
+                - step                  Step size (fraction of the range of parameter)
+                - ftol                  Tolerance for convergence of the cost function
+                - xtol                  Tolerance for convergence of the step size
+                - thresh_type           Set to "abs" for absolute convergence of the cost function,
+                                            "rel" for relative convergence
+
+    Outputs:    - best_R                Optimized rotation matrix
+                - best_cost             Optimized cost function
+    """
+
+    axes = ["x", "y", "z"]
+
+    best_R = copy.deepcopy(R)
+    converged = False
+
+    if step < xtol:
+        return best_R, best_cost
+
+    if verbose:
+        print("  Optimizing rotation. Step size: {}".format(step))
+
+    # Generate initial rotation
+    while not converged:
+        converged = True
+
+        # Loop over the three axes
+        for i in range(3):
+
+            old_R = copy.deepcopy(best_R)
+
+            # Generate the initial rotations (positive and negative angles)
+            r_p = np.array([0., 0., 0., bounds[1]])*step
+            r_m = np.copy(r_p)
+            r_m[-1] *= -1
+
+            # Set the axis of rotation
+            r_p[i] = 1.
+            r_m[i] = 1.
+
+            # Generate the rotation matrices
+            R_p = cr.rotation_matrix(r_p).dot(old_R)
+            R_m = cr.rotation_matrix(r_m).dot(old_R)
+
+            # Get the cost associated with the positive and negative steps
+            cryst_p, clash_p = cr.create_crystal(struct, lat, trans, R_p, conf_angles, sg, n_atoms, conf_params=conf_params)
+            if clash_p:
+                tmp_cost_p["Tot"] = 1e12
+            else:
+                tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
+
+            cryst_m, clash_m = cr.create_crystal(struct, lat, trans, R_m, conf_angles, sg, n_atoms, conf_params=conf_params)
+            if clash_m:
+                tmp_cost_m["Tot"] = 1e12
+            else:
+                tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
+
+            # If positive direction is found, increase the parameter until energy rises
+            if tmp_cost_p["Tot"] < best_cost["Tot"] and tmp_cost_p["Tot"] < tmp_cost_m["Tot"]:
+                converged = False
+                if verbose:
+                    print("  Increasing the rotation angle along {} decreases the cost".format(axes[i]))
+                # While the energy decreases
+                while tmp_cost_p["Tot"] < best_cost["Tot"]:
+                    # Update the best parameter and associated cost
+                    best_cost = copy.copy(tmp_cost_p)
+                    best_R = copy.copy(R_p)
+                    # Generate a new parameter
+                    r_p[-1] += step*bounds[1]
+                    R_p = cr.rotation_matrix(r_p).dot(old_R)
+                    # Generate the corresponding crystal
+                    cryst_p, clash_p = cr.create_crystal(struct, lat, trans, R_p, conf_angles, sg, n_atoms, conf_params=conf_params)
+                    # Compute cost
+                    if clash_p:
+                        tmp_cost_p["Tot"] = 1e12
+                    else:
+                        tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
+                    if verbose:
+                        print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_p["Tot"]))
+
+            # If negative direction is found, decrease the parameter until energy rises
+            elif tmp_cost_m["Tot"] < best_cost["Tot"] and tmp_cost_m["Tot"] < tmp_cost_p["Tot"]:
+                converged = False
+                if verbose:
+                    print("  Decreasing the rotation angle along {} decreases the cost".format(axes[i]))
+                # While the energy decreases
+                while tmp_cost_m["Tot"] < best_cost["Tot"]:
+                    # Update the best parameter and associated cost
+                    best_cost = copy.copy(tmp_cost_m)
+                    best_R = copy.copy(R_m)
+                    # Generate a new parameter
+                    r_m[-1] -= step*bounds[1]
+                    R_m = cr.rotation_matrix(r_m).dot(old_R)
+                    # Generate the corresponding crystal
+                    cryst_m, clash_m = cr.create_crystal(struct, lat, trans, R_m, conf_angles, sg, n_atoms, conf_params=conf_params)
+                    # Compute cost
+                    if clash_p:
+                        tmp_cost_m["Tot"] = 1e12
+                    else:
+                        tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
+                    if verbose:
+                        print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_m["Tot"]))
+
+
+    return optimize_rot(struct, best_cost, bounds, lat, trans, best_R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose, N_max=N_max)
+
+
+
+def optimize_conf(struct, i, best_cost, bounds, lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=None, step=1e-2, ftol=1e-2, xtol=1e-4, thresh_type="abs", verbose=False):
+    """
+    Optimize the cost function with respect to all lattice parameters, iteratively.
+
+    Inputs:     - struct                Input crystal structure
+                - i                     Index of the conformer angle to change
+                - best_cost             Initial cost
+                - bounds                Bounds for the parameter
+                - lat                   Initial lattice parameters
+                - trans                 Translation vector
+                - R                     Rotation matrix
+                - conf_angles           Conformational angles
+                - sg                    Space group of the crystal
+                - n_atoms               Number of atoms in the molecules
+                - cost_function         Form of the cost function
+                - cost_factors          Factors of each part of the cost function
+                - cost_options          Options for the parts of the cost function
+                - conf_params           Atoms and masks in conformer angles
+                - step                  Step size (fraction of the range of parameter)
+                - ftol                  Tolerance for convergence of the cost function
+                - xtol                  Tolerance for convergence of the step size
+                - thresh_type           Set to "abs" for absolute convergence of the cost function,
+                                            "rel" for relative convergence
+
+    Outputs:    - best_conf             Optimized conformational angles
+                - best_cost             Optimized cost function
+    """
+
+    best_conf = copy.deepcopy(conf_angles)
+
+    # If the step size is too small, return the original conformer angle
+    if step < xtol:
+        return best_conf, best_cost
+
+    if verbose:
+        print("  Optimizing conformer angle {}/{}. Initial value {}, step size {}".format(i+1, len(conf_angles), conf_angles[i], step))
+
+    # Obtain step size
+    span = bounds[1]-bounds[0]
+    dx = span * step
+
+    # Generate steps in positive and negative directions
+    tmp_conf_p = copy.copy(best_conf)
+    tmp_conf_p[i] += dx
+    tmp_conf_m = copy.copy(best_conf)
+    tmp_conf_m[i] -= dx
+
+    # Restrict parameters to be within the bounds
+    if tmp_conf_p[i] > bounds[1]:
+        tmp_conf_p[i] -= bounds[1]
+    if tmp_conf_p[i] < bounds[0]:
+        tmp_conf_p[i] += bounds[0]
+    if tmp_conf_m[i] > bounds[1]:
+        tmp_conf_m[i] -= bounds[1]
+    if tmp_conf_m[i] < bounds[0]:
+        tmp_conf_m[i] += bounds[0]
+
+    # Generate modified crystals
+    cryst_p, clash_p = cr.create_crystal(struct, lat, trans, R, tmp_conf_p, sg, n_atoms, conf_params=conf_params)
+    cryst_m, clash_m = cr.create_crystal(struct, lat, trans, R, tmp_conf_m, sg, n_atoms, conf_params=conf_params)
+
+    # Compute cost of the modified crystals
+    if clash_p:
+        tmp_cost_p["Tot"] = 1e12
+    else:
+        tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
+    if clash_m:
+        tmp_cost_m["Tot"] = 1e12
+    else:
+        tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
+
+    # If no direction is found, decrease the step size by two and try again
+    if tmp_cost_p["Tot"] >= best_cost["Tot"]-1e-6 and tmp_cost_m["Tot"] >= best_cost["Tot"]-1e-6:
+        if verbose:
+            print("  Minimum found, decreasing step size")
+        return optimize_conf(struct, i, best_cost, bounds, lat, trans, R, conf_angles, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+    # If positive direction is found, increase the parameter until energy rises
+    elif tmp_cost_p["Tot"] < best_cost["Tot"] and tmp_cost_p["Tot"] < tmp_cost_m["Tot"]:
+        if verbose:
+            print("  Increasing the parameter decreases the cost")
+        # While the energy decreases
+        while tmp_cost_p["Tot"] < best_cost["Tot"]:
+            # Update the best parameter and associated cost
+            best_cost = copy.copy(tmp_cost_p)
+            best_conf = copy.copy(tmp_conf_p)
+            # Generate a new parameter
+            tmp_conf_p[i] += dx
+            # Generate the corresponding crystal
+            cryst_p, clash_p = cr.create_crystal(struct, lat, trans, R, tmp_conf_p, sg, n_atoms, conf_params=conf_params)
+            # Compute cost
+            if clash_p:
+                tmp_cost_p["Tot"] = 1e12
+            else:
+                tmp_cost_p = compute_cost(cryst_p, cost_function, cost_factors, cost_options)
+            if verbose:
+                print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_p["Tot"]))
+        # Restart the optimization with reduced step size
+        return optimize_conf(struct, i, best_cost, bounds, lat, trans, R, best_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+    # If negative direction is found, increase the parameter until energy rises
+    elif tmp_cost_m["Tot"] < best_cost["Tot"] and tmp_cost_m["Tot"] < tmp_cost_p["Tot"]:
+        if verbose:
+            print("  Decreasing the parameter decreases the cost")
+        # While the energy decreases
+        while tmp_cost_m["Tot"] < best_cost["Tot"]:
+            # Update the best parameter and associated cost
+            best_cost = copy.copy(tmp_cost_m)
+            best_conf = copy.copy(tmp_conf_m)
+            # Generate a new parameter
+            tmp_conf_m[i] -= dx
+            # Generate the corresponding crystal
+            cryst_m, clash_m = cr.create_crystal(struct, lat, trans, R, tmp_conf_m, sg, n_atoms, conf_params=conf_params)
+            # Compute cost
+            if clash_m:
+                tmp_cost_m["Tot"] = 1e12
+            else:
+                tmp_cost_m = compute_cost(cryst_m, cost_function, cost_factors, cost_options)
+            if verbose:
+                print("  Cost before this step: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost_m["Tot"]))
+        # Restart the optimization with reduced step size
+        return optimize_conf(struct, i, best_cost, bounds, lat, trans, R, best_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step/2., ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+    else:
+        raise ValueError("Error during the optimization of conformer angle {}".format(i+1))
+        return
+
+
+
+def iterative_opt(struct, lat, trans, R, conf_angles, sg, n_atoms, parameter_set, cost_function, cost_factors, cost_options, cell_params_lims, conf_params=None, n_max=100, verbose=False, step=1e-2, ftol=1., xtol=1e-4, thresh_type="abs"):
+    """
+    Optimize the cost function with respect to all variable parameters.
+
+    Inputs:     - struct                Initial crystal structure
+                - lat                   Starting lattice parameters
+                - trans                 Starting translation vector (fractions of the unit cell)
+                - R                     Starting rotation matrix
+                - conf_angles           Starting conformational angles
+                - sg                    Space group of the crystal
+                - n_atoms               Number of atoms in the molecule
+                - parameter_set         Set of parameters to optimize
+                - cost_function         Form of the cost function
+                - cost_factors          Factors of each part of the cost function
+                - cost_options          Options for the parts of the cost function
+                - conf_params           Atoms and masks in conformer angles
+                - n_max                 Maximum number of optimization iterations
+                - verbose               Verbosity level
+                - step                  Step size (fraction of range of each parameter)
+                - ftol                  Tolerance for convergence of the cost function
+                - xtol                  Tolerance for convergence of the step size
+                - thresh_type           Set to "abs" for absolute convergence of the cost function,
+                                            "rel" for relative convergence
+
+    Outputs:    - opt_crystal           Optimized crystal structure
+                - opt_lat               Optimized lattice parameters
+                - opt_trans             Optimized translation vector
+                - opt_R                 Optimized rotation matrix
+                - opt_conf              Optimized conformational angles
+    """
+
+    # Generate initial crystal
+    init_cryst, _ = cr.create_crystal(struct, lat, trans, R, conf_angles, sg, n_atoms, conf_params=conf_params)
+    # Get initial cost
+    best_cost = compute_cost(init_cryst, cost_function, cost_factors, cost_options)
+
+    print(best_cost)
+
+    converged = False
+
+    opt_lat = copy.deepcopy(lat)
+    opt_trans = copy.deepcopy(trans)
+    opt_R = copy.deepcopy(R)
+    opt_conf = copy.deepcopy(conf_angles)
+    tmp_cost = copy.deepcopy(best_cost)
+
+    k = 0
+    while not converged:
+        k += 1
+        best_cost = copy.deepcopy(tmp_cost)
+        # Optimize cell parameters
+        for p in ["a", "b", "c", "alpha", "beta", "gamma"]:
+            if p in ["a", "b", "c"]:
+                bounds = cell_params_lims[0], cell_params_lims[1]
+            elif p in ["alpha", "beta", "gamma"]:
+                bounds = cell_params_lims[2], cell_params_lims[3]
+            if p in parameter_set:
+                opt_lat, tmp_cost = optimize_lat_param(struct, p, tmp_cost, bounds, opt_lat, opt_trans, opt_R, opt_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step, ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+        # Optimize translation
+        if "trans" in parameter_set:
+            bounds = [0., 1.]
+            opt_trans, tmp_cost = optimize_trans(struct, tmp_cost, bounds, opt_lat, opt_trans, opt_R, opt_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step, ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+        # Optimize rotation
+        if "rot" in parameter_set:
+            bounds = [0., 180.]
+            opt_R, tmp_cost = optimize_rot(struct, tmp_cost, bounds, opt_lat, opt_trans, opt_R, opt_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step, ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+        # TODO: optimize conformation
+        if "conf" in parameter_set:
+            bounds = [0., 360.]
+            for i in range(len(conf_angles)):
+                opt_conf, tmp_cost = optimize_conf(struct, i, tmp_cost, bounds, opt_lat, opt_trans, opt_R, opt_conf, sg, n_atoms, cost_function, cost_factors, cost_options, conf_params=conf_params, step=step, ftol=ftol, xtol=xtol, thresh_type=thresh_type, verbose=verbose)
+
+        # Check for convergence (relative threshold)
+        print("Cost before this optimization iteration: {:.2f}, cost after: {:.2f}".format(best_cost["Tot"], tmp_cost["Tot"]))
+        if thresh_type == "rel":
+            if np.abs((tmp_cost["Tot"]-best_cost["Tot"])/best_cost["Tot"]) < ftol:
+                converged = True
+                print("Converged!")
+        # Check for convergence (absolute threshold)
+        elif thresh_type == "abs":
+            if np.abs(tmp_cost["Tot"]-best_cost["Tot"]) < ftol:
+                converged = True
+                print("Converged!")
+
+        if not converged and k >= n_max:
+            converged = True
+            print("Max number of optimization runs reached!")
+
+    # Generate optimized crystal
+    opt_crystal, _ = cr.create_crystal(struct, opt_lat, opt_trans, opt_R, opt_conf, sg, n_atoms, conf_params=conf_params)
+
+    return opt_crystal, opt_lat, opt_trans, opt_R, opt_conf

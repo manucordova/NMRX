@@ -1,10 +1,10 @@
-#####
-# Last modified 29.06.2020
-# Re-writing the script so that it is more general
-# Authors: Manuel Cordova, Martins Balodis
-#####
-
-
+###################################################################################################
+#####                                                                                         #####
+#####                        Functions to run DFTB energy computations                        #####
+#####                     Author: Manuel Cordova (manuel.cordova@epfl.ch)                     #####
+#####                                Last modified: 23.03.2022                                #####
+#####                                                                                         #####
+###################################################################################################
 
 ### Import libraries
 import numpy as np
@@ -19,49 +19,32 @@ import shutil
 def which(pgm):
     """
     Find the path to a program
-    
+
     Inputs:     - pgm   Program name
-    
+
     Outputs:    - p     path to program pgm
     """
-    
+
     path = os.getenv('PATH')
     for p in path.split(os.path.pathsep):
         p = os.path.join(p, pgm)
         if os.path.exists(p) and os.access(p, os.X_OK):
-        
+
             return p
-    
+
     raise ValueError("Path not found.")
-    
+
     return
-
-
-
-def spawn(cluster, out_dir, name):
-    number = str(np.random.random())
-    if cluster:
-        dftb_root = "/dev/shm/"
-    else:
-        dftb_root = out_dir + name + "/"
-    
-    dftb_dir = dftb_root + number + "_tmp/"
-    if not os.path.exists(dftb_dir):
-        os.mkdir(dftb_dir)
-    
-    process = sp.Popen([], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
-    
-    return process, dftb_dir
 
 
 
 def compute_k_points(lattice, factor):
     """
     Generate k-points from the distance in k-space (given by the k-point factor)
-    
+
     Inputs:     - lattice   Unit cell lengths
                 - factor    Maximum distance in k-space
-    
+
     Outputs:    - k_points  Number of k-points in each dimension
     """
     k_points = []
@@ -77,9 +60,9 @@ def compute_k_points(lattice, factor):
 def compute_s_values(k_points):
     """
     Convert k-points in s values used by DFTB
-    
+
     Inputs:     - k_points      List of k-points
-    
+
     Outputs:    - s_values      List of s-values used by DFTB
     """
     s_values = []
@@ -95,7 +78,7 @@ def compute_s_values(k_points):
 def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=None, comp_type="sp", driver="SD", relax_elems="all", max_steps=10000, SCC=True, DFTB3=False, showForces=False):
     """
     Generate DFTB+ input file
-    
+
     Inputs:     - xyz                   Input structure
                 - periodic              Whether the structure is periodic or not
                 - skfdir                Directory for the DFTB parameter files
@@ -130,7 +113,7 @@ def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=N
     for i, position in enumerate(pos):
         pp += "  " + str(elements.index(typ[i])+1) + " " + str(round(position[0],6)) + " " + str(round(position[1],6)) + " " + str(round(position[2],6)) + "\n"
     pp += " }\n"
-        
+
     if periodic:
         pp += " Periodic = Yes\n"
 
@@ -228,7 +211,7 @@ def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=N
             raise ValueError("Unknown driver!")
         pp += "  MaxSteps = {}\n".format(max_steps)
         pp += "  OutputPrefix = relax\n"
-        
+
         if isinstance(relax_elems, str):
             if relax_elems != "all":
                 raise ValueError("Enter a list of elements to relax")
@@ -252,12 +235,12 @@ def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=N
         pp += " }\n"
 
         pp += "}\n"
-    
+
     if showForces:
         pp += "Analysis {\n"
         pp += " CalculateForces = Yes\n"
         pp += "}\n"
-        
+
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
@@ -270,18 +253,18 @@ def make_dftb_input(xyz, periodic, skfdir, outdir, dispersion, k_points_factor=N
 def dftbplus_energy(directory, struct, dftb_path, dispersion="D3H5"):
     """
     DFTB+ single-point energy computation
-    
+
     Inputs:     - directory     F
                 - struct
                 - dftb_path     Path for the DFTB program
                 - dispersion    Type of dispersion correction to use
-    
+
     Outputs:    - E     F
     Options:    struct = ase.Atoms object. Crystal structure to compute the energy for
                 fileformat = "cif", "xyz", ... (any format valid for ASE)
                 dispersion = "D3", "LJ", "None"
     """
-    
+
     # Create temporary directory to store the DFTB files
     number = str(np.random.random())
     if not os.path.exists(directory+number+"tmp/"):
@@ -333,7 +316,7 @@ def dftbplus_forces(directory, struct, dftb_path, dispersion="D3H5"):
                 fileformat = "cif", "xyz", ... (any format valid for ASE)
                 dispersion = "D3", "LJ", "None"
     """
-    
+
     # Initialize array of forces
     forces = np.zeros((len(struct), 3))
     # Initialize stress tensor
@@ -358,15 +341,15 @@ def dftbplus_forces(directory, struct, dftb_path, dispersion="D3H5"):
     # Run DFTB and get output
     output = sp.run([dftb_path], capture_output=True)
     outputStr = output.stdout.decode("utf-8").split("\n")
-    
+
     with open(outdir + "/detailed.out", "r") as F:
         lines = F.read().split("\n")
-    
+
     for i, l in enumerate(lines):
         if "Total Forces" in l:
             for j in range(len(struct)):
                 forces[j] = np.array([float(x) for x in lines[i+j+1].split()[1:]])
-        
+
         if "Total stress tensor" in l:
             for j in range(3):
                 stress[j] = np.array([float(x) for x in lines[i+j+1].split()])
@@ -376,9 +359,9 @@ def dftbplus_forces(directory, struct, dftb_path, dispersion="D3H5"):
     # Obtain energy
     #output, error = process.communicate()
     out = [s for s in outputStr if 'Total Energy' in s]
-    
-    
-    
+
+
+
     # Remove the temporary directory
     shutil.rmtree(outdir)
     try:
@@ -421,15 +404,15 @@ def dftb_relax(directory, struct, dftb_path, n_opt, elems=["H"], dispersion="D3H
 
     # Run DFTB and get output
     output = sp.run([dftb_path], capture_output=True)
-    
+
     # Get relaxed crystal
     out_struct = ase.io.read(outdir + "/relax.gen")
-    
+
     # Come back to the initial directory
     os.chdir(initdir)
     # Remove the temporary directory
     shutil.rmtree(outdir)
-    
+
     return out_struct
 
 
@@ -437,7 +420,7 @@ def dftb_relax(directory, struct, dftb_path, n_opt, elems=["H"], dispersion="D3H
 def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2., contact=False, c_type="avg"):
     """
     Compute the cost associated with the selected distance constraints
-    
+
     Inputs:     - struct        Input structure
                 - n_atoms       Number of atoms in a single molecule
                 - pairs         Pairs of atoms to compute the constraints for (should refer to the atoms in the
@@ -450,11 +433,11 @@ def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.,
                 - c_type        Type of constraint (sum == sum, avg == average, rmsd == root-mean-square deviation
                                     [overrides the exponent variable])
     """
-    
+
     # Get number of molecules in the unit cell
     symbs = struct.get_chemical_symbols()
     n_mol = int(len(symbs)/n_atoms)
-    
+
     min_ds = []
     # For each pair of atoms set
     for p in pairs:
@@ -466,14 +449,14 @@ def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.,
         ds.extend(struct.get_distances(p[0], js, mic=True))
         if len(ds) < 1:
             raise ValueError("Error when computing the distance for pair {}-{}".format(p[0], p[1]))
-        
+
         # Get minimum distance
         min_ds.append(np.min(ds))
-        
+
     # Retract the threshold from the minimum distance
     min_ds = np.array(min_ds)
     min_ds -= thresh
-    
+
     # Invert the sign if a contact is expected
     if type(contact) == bool:
         if contact:
@@ -482,10 +465,10 @@ def compute_distance_constraints(struct, n_atoms, pairs, thresh=5., exponent=2.,
         min_ds[contact] *= -1.
     else:
         raise ValueError("The variable contact should be a boolean or a list, not {}".format(type(contact)))
-    
+
     # Set negative values to zero (constraint is fulfilled)
     min_ds[min_ds < 0] = 0
-    
+
     # Return the corresponding cost
     if c_type == "sum":
         return np.sum(np.power(min_ds, exponent))
