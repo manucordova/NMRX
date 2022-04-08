@@ -1,21 +1,19 @@
+
 # NMRX
-NMRX stands for NMR Crystallography. This uses experimental chemical shifts to drive structure generation schemes towards reasonable crystal structures.
 
-# TODO
+NMRX stands for NMR Crystallography. This project uses experimental chemical shifts to drive structure generation schemes towards reasonable crystal structures. This is done through Monte-Carlo simulated annealing. Please read the [paper describing the method](https://dx.doi.org/10.1021/jacs.1c13733).
 
-## Structure generation
-- Restrict the cell volume to a (fixed) factor times the volume of the single-molecule.
-- Change the way rotation steps are generated in order to make the rotations uniform.
-- Get the third cell length value after determining the cell angles and other cell lengths, in order to have a reasonable volume for the starting crystal.
-- Weight trial dihedral angles with probabilities determined with Mogul
-- Generate cell lengths after cell angles and orientation of the molecule, according to the length of the molecule projected onto the corresponding direction
+## Requirements
 
-## Monte-Carlo run
-- Change the sampling from Gaussian to uniform
-- Change the initial temperature (2.5kJ, even 25kJ ?)
-- Maybe do basement hopping to search for different minima ?
-- Induce a change in volume when changing the orientation of the molecule in order to make clashes less likely
+- Python 3 (3.7)
+  - Numpy (1.19.1)
+  - ASE (3.19.1)
+  - [QUIP/quippy](http://libatoms.github.io/QUIP/) [will soon be updated with librascal]
+- [DFTB+](https://dftbplus.org)
+- [ShiftML kernels](https://www.materialscloud.org/work/tools/shiftml) [will soon be updated with ShiftML2]
 
-## Misc
-- Restrict the spacegroup for chiral molecules to spacegroup without inversion centers or mirror planes
-- Change ASE crystals with CCDC objects to avoid wrapping issues
+## Subdirectories
+
+- input_structures: Contains the initial conformer for each molecule explored. Any random conformer can be used.
+- src: Contains source files for the simulations.
+- run: Contain run script and SLURM submission scripts to run the experiments on a cluster.
