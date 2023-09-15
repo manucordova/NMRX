@@ -1,4 +1,6 @@
 
+# NOTE: This code is deprecated and has been included in the `crystal` module of the [`MolDS` package](https://github.com/manucordova/MolDS)
+
 # NMRX
 
 NMRX stands for NMR Crystallography. This project uses experimental chemical shifts to drive structure generation schemes towards reasonable crystal structures. This is done through Monte-Carlo simulated annealing. Please read the [paper describing the method](https://dx.doi.org/10.1021/jacs.1c13733).
